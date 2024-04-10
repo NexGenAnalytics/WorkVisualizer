@@ -46,9 +46,10 @@ mv em_4p_100s_alltrace.json ${WORKVIZ_DIR}/data
 
 The plotting script looks for the following naming convention in the data files:
 ```sh
-<app>_<num-procs>p_<num-steps>s_<all/mpi>trace.json
+<app>_<num-procs>p_<num-steps>s_<all/mpi>trace.json # template
+em_4p_100s_alltrace.json                            # example
 ```
-- `<app>`: Can be any identifier for the executable that generated the data. The following app identifiers are automatically recognized (so the full app name will be output ont the plots).
+- `<app>`: Can be any identifier for the executable that generated the data. The following app identifiers are automatically recognized (so the full app name will be output on the plots).
   - `em` -> `MiniEM`
   - `mpm` -> `ExaMPM`
   - `md` -> `ExaMiniMD`
