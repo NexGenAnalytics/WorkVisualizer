@@ -106,6 +106,10 @@ A number of other parameters exist as well:
                       frequency analysis.
 ```
 
+Here is an example of the final plot (generated with Mini-EM on 4 processors and over 100 timesteps).
+![Screenshot from 2024-04-19 15-40-37](https://github.com/NexGenAnalytics/WorkVisualizer/assets/132086024/4d0f3cc3-b681-43a3-be53-92b24d7f8940)
+
+
 ### 2. `create_hierarchy.py`
 
 This script takes in the entire Caliper data dump and outputs a JSON that is compatible with the D3 call tree example ([link](https://observablehq.com/d/273ba128f4494a5c)).
