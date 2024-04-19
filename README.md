@@ -96,10 +96,9 @@ A number of other parameters exist as well:
 -a   <ALL>            Plots all functions instead of just periodic ones
 -v   <VERTICAL>       Outputs the plot vertically.
 
--p   <PROC>           The processor to be plotted (one processor is
-                      plotted)
--t   <TARGET>         The processor to be colored (all processors are
-                      plotted)
+-p   <PROC>           The processor to be plotted (one processor is plotted)
+-t   <TARGET>         The processor to be colored (all processors are plotted)
+
 -dt  <DRAW_TIMESTEP>  Draws the timesteps on the final plot.
 -dm  <DRAW_MACROLOOP> Draws the macro-loops on the final plot.
 
