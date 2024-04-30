@@ -90,20 +90,22 @@ python plotting_scripts/plot_all_data.py -i data/<filename>.json
 A number of other parameters exist as well:
 
 ```
--i   <INPUT>          The input JSON file (this one's not optional)
--s   <SAVE>           Saves results to the plots directory.
+-i    <INPUT>          The input JSON file (this one's not optional)
+-s    <SAVE>           Saves results to the plots directory.
 
--a   <ALL>            Plots all functions instead of just periodic ones
--v   <VERTICAL>       Outputs the plot vertically.
+-a    <ALL>            Plots all functions instead of just periodic ones
+-f    <FILTERED>       Plots only the filtered functions (top 2% most-called functions)
+-v    <VERTICAL>       Outputs the plot vertically.
+-sort <SORT>           Sort by `path`, `call` or `rank`
 
--p   <PROC>           The processor to be plotted (one processor is plotted)
--t   <TARGET>         The processor to be colored (all processors are plotted)
+-p    <PROC>           The processor to be plotted (one processor is plotted)
+-t    <TARGET>         The processor to be colored (all processors are plotted)
 
--dt  <DRAW_TIMESTEP>  Draws the timesteps on the final plot.
--dm  <DRAW_MACROLOOP> Draws the macro-loops on the final plot.
+-dt   <DRAW_TIMESTEP>  Draws the timesteps on the final plot.
+-dm   <DRAW_MACROLOOP> Draws the macro-loops on the final plot.
 
--b   <BIN_COUNT>      The number of bins to use when discretizing for
-                      frequency analysis.
+-b    <BIN_COUNT>      The number of bins to use when discretizing for
+                       frequency analysis.
 ```
 
 Here is an example of the final plot (generated with Mini-EM on 4 processors and over 100 timesteps).
@@ -117,7 +119,39 @@ This script takes in the entire Caliper data dump and outputs a JSON that is com
 Usage is simple. Generate the data (see above) and then run:
 
 ```
-python scripts/create_hierarchy.py -i data/<filename>.json
+python scripts/create_function_tree.py -i data/<filename>.json
 ```
 
 The resulting JSON (`*_d3_hierarchy.json`) is written to the `hierarchy/` directory.
+
+### 3. `prune_json.py`
+
+#### Data Generation
+This script takes in the Caliper data for a single rank. During the data collection, run
+
+```sh
+cali-query -q "SELECT * FORMAT json" alltrace-0.cali | tee <filename>.json
+mv <filename>.json ${WORKVIZ_DIR}/data
+```
+
+(The difference is replacing `*.cali` with the rank-specific .cali file.) Ensure that the resulting JSON `filename` is named appropriately.
+
+For convention, keep the same naming pattern but replace `<n_procs>p` with `<rank>r`.
+
+For example:
+
+```sh
+<app>_<rank>r_<num-steps>s(_<misc>).json # template
+em_0r_100s_trace.json                    # example with MiniEM
+```
+
+As before, move the resulting JSON into the WorkVisualizer/data directory.
+
+#### Running the Script
+
+Run the following command:
+```sh
+python scripts/prune_json.py -i data/<filename>
+```
+
+This will generate a new file in `data/<APP-NAME>` with the pruned JSON.

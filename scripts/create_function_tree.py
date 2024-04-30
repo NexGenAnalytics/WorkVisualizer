@@ -35,13 +35,9 @@ Steps to recreate:
 ######################################################################################################################
 
 def custom_sort_key(event):
-    # Check if "kernel_type" exists in the event
     if "kernel_type" in event:
-        # Split the "kernel_type" by "/" and return the length of the resulting list
         return len(event["kernel_type"].split("/"))
-    else:
-        # Return a large number for events without "kernel_type" to ensure they come first
-        return float('inf')
+    return np.inf
 
 def get_children_dict_index(current_list):
     if current_list is not None:
@@ -51,9 +47,9 @@ def get_children_dict_index(current_list):
                 return i
     return None
 
-def get_children_list(current_list):
+def get_children_list(current_list, region_name):
     for elt in current_list:
-        if isinstance(elt, dict) and "children" in elt:
+        if isinstance(elt, dict) and "children" in elt and elt["name"] == region_name:
             return elt["children"]
 
 # Parse command line arg for the json file
@@ -116,10 +112,13 @@ for event in json_data:
     if "event.begin#region" in event or "event.begin#mpi.function" in event:
 
         if event["mpi.rank"] != 0:
-          continue
+            continue
 
         # Get the function name (note: this can be an MPI call, a Kokkos call, or a new Kokkos region)
         function_name = event["event.begin#region"] if "event.begin#region" in event else event["event.begin#mpi.function"]
+
+        if "Kokkos" in function_name or "Tpetra" in function_name:
+            continue
 
         # Determine if the event is creating a new region
         new_region = False
@@ -145,6 +144,9 @@ for event in json_data:
         if function_name in known_events[region_id]:
             continue
 
+        if "CG" in function_name:
+            print(f"Processing {function_name}")
+
         # Then update the known_regions dict so we don't repeat regions
         known_events[region_id].append(function_name)
 
@@ -164,12 +166,12 @@ for event in json_data:
                     dict_idx = get_children_dict_index(current_list)
 
                     # If there is already a dict, rename it to this region (this is the case where we made the region without knowing the name)
-                    if dict_idx:
-                        current_list[dict_idx]["name"] = function_name
-                        print(f"Rewrote region for {function_name}.")
+                    if dict_idx and current_list[dict_idx]["name"] == "stand-in":
+                            current_list[dict_idx]["name"] = function_name
+                            print(f"Rewrote region for {function_name}.")
                     else:
                         current_list.append({"name": function_name, "children": []})
-                    current_list = get_children_list(current_list)
+                    current_list = get_children_list(current_list, function_name)
 
                 # Otherwise, update the current list to the next level and try again
                 else:
@@ -188,8 +190,7 @@ for event in json_data:
 
                 # Create the dict with a dummy "name" that will be overwritten later once we know it
                 else:
-                    print("we're in here")
-                    current_list.append({"name": current_region, "children": []})
+                    current_list.append({"name": "stand-in", "children": []})
                     current_list = get_children_list(current_list)
 
 print(hierarchies)

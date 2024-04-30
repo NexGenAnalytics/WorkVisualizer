@@ -5,10 +5,10 @@ import os
 import json
 import argparse
 import numpy as np
-from math import log10, floor, isclose
+from math import isclose
 from scipy.stats import mode
 from scipy.signal import find_peaks
-from scipy.fft import fft, fftfreq, fftshift
+from scipy.fft import fft, fftshift
 from collections import Counter
 import matplotlib.pyplot as plt
 from matplotlib import colormaps
@@ -37,6 +37,16 @@ Steps to recreate:
 #################                                                                                    #################
 ######################################################################################################################
 
+# For adjusting the lightness of colors in the final plot
+def adjust_lightness(color, amount=0.5):
+    import matplotlib.colors as mc
+    import colorsys
+    try:
+        c = mc.cnames[color]
+    except:
+        c = color
+    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+    return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
 
 # Set time constraint based on requested metaslice
 def time_constraint(begin_time, metaslice):
@@ -57,12 +67,19 @@ def signal_to_noise(input_data):
     std = np.std(a)
     return np.where(std == 0, 0, mean/std)
 
+def sort_functions(function_name, sorting_dict, sorting_key):
+    # Average across all ranks
+    if sorting_key not in sorting_dict:
+        raise ValueError(f"{sorting_key} not recognized. Use 'path' or 'duration'.")
+    return np.mean(sorting_dict[sorting_key][function_name])
 
 # Parse command line arg for the json file
 parser = argparse.ArgumentParser(description="Takes in the path to an executable and returns a visualization of the Kokkos kernels.")
 parser.add_argument("-i", "--input", help="Input JSON file containing MPI traces for all ranks.")
 parser.add_argument("-s", "--save", action="store_true", help="Whether or not to save the plot to a file.")
 parser.add_argument("-a", "--all", action="store_true", help="Whether or not to plot ALL functions on the final plot (and not just the periodic ones).")
+parser.add_argument("-f", "--filtered", action="store_true", help="Plots only the FILTERED functions on the final plot.")
+parser.add_argument("-sort", "--sorting_key", default=None, help="`path`, `call`, or `rank`")
 parser.add_argument("-dt", "--draw_timesteps", action="store_true", help="Whether or not to draw the timesteps on the final plot.")
 parser.add_argument("-dm", "--draw_macroloops", action="store_true", help="Whether or not to draw the macroloopss on the final plot.")
 parser.add_argument("-p", "--proc", default=-1, help="Processor to be plotted. Defaults to all available processors.")
@@ -80,6 +97,8 @@ draw_timesteps = args.draw_timesteps
 draw_macroloops = args.draw_macroloops
 output_proc = int(args.proc)
 plot_all_functions = args.all
+plot_filtered_functions = args.filtered
+sorting_key = args.sorting_key.lower()
 target_proc = int(args.target)
 metaslice = args.metaslice
 vertical_plot = args.vertical
@@ -99,6 +118,22 @@ else:
     app = app_abr
 n_procs = int(file_splits[1].split("p")[0])
 n_steps = int(file_splits[2].split("s")[0])
+
+# Determine sorting key
+if sorting_key is None:
+    yaxis_label = "Default Ordering (read-in sequence)"
+elif sorting_key == "path":
+    yaxis_label = "-----> Increasing Depth in the Path ----->"
+elif sorting_key == "rank":
+    yaxis_label = f"Functions ordered by Rank (0 --> {n_procs})"
+elif sorting_key == "duration":
+    yaxis_label = "-----> Increasing Time Spent in Each Function ----->"
+elif sorting_key == "call":
+    yaxis_label ="Functions ordered by call type (MPI Collective -> MPI -> Kokkos)"
+else:
+    print(f" Sorting key {sorting_key} not recongized; using the default ordering instead. Supported keys: 'path', 'call', 'rank'.")
+    sorting_key = None
+    yaxis_label = "Default Ordering (read-in sequence)"
 
 # Create save directory
 current_dir = os.getcwd()
@@ -123,11 +158,16 @@ json_data = json.load(f)
 # Initialize all timings and counts
 all_times = {}
 function_total_counts = {}
+sorting_dict = {"path": {}, "call": {}, "rank": {}, "duration": {}}
+begin_times_dict = {}
+end_times_dict = {}
 
 # Get all ranks' init time
 all_init_times = [0.] * n_procs
 program_max_time = 0.
 program_min_time = 0. # we enforce this later when dealing with the offset
+
+longest_duration = ["", 0.]
 
 # Move the target_rank to the end of the list so it is plotted last
 ranks_list = [rank for rank in range(n_procs)]
@@ -141,15 +181,28 @@ for event in json_data:
     # Get name of MPI function or Kokkos kernel
     if time_constraint(begin_time, metaslice) and "event.begin#mpi.function" in event:
         function_name = event["event.begin#mpi.function"]
+
     elif time_constraint(begin_time, metaslice) and "event.begin#region" in event:
         function_name = event["event.begin#region"]
+
     else:
         continue
 
+    # Append the depth of the path to the function name
+    if "path" in event:
+        if event['path'].count('/') + 1 < 10:
+            continue
+        function_name += f" Path {event['path'].count('/') + 1}"
+    else:
+        function_name += " Path 0"
+
+    # Append the rank to the function name
+    function_name += f" Rank {event['mpi.rank']}"
+
     # Add to times dict
     if function_name not in all_times:
-        all_times.setdefault(function_name, {proc: [] for proc in range(n_procs)})
-    all_times[function_name][rank].append(begin_time)
+        all_times.setdefault(function_name, [])
+    all_times[function_name].append(begin_time)
 
     # Add to counts dict
     if function_name not in function_total_counts:
@@ -164,27 +217,52 @@ for event in json_data:
     if function_name == "MPI_Init":
         all_init_times[rank] = begin_time
 
+    # Populate the sorting dict
+    if sorting_key is not None:
+        if function_name not in sorting_dict[sorting_key]:
+            sorting_dict[sorting_key].setdefault(function_name, 0)
+
+        # Sort by path
+        if sorting_key == "path":
+            sorting_val = 0 if "path" not in event else event["path"].count("/") + 1
+
+        # Sort by rank
+        elif sorting_key == "rank":
+            sorting_val = rank
+
+        # Sort by call type
+        elif sorting_key == "call":
+            sorting_val = 0 if function_name.split(" Path ")[0] in all_collectives else (1 if "MPI" in function_name else 2)
+
+        # Add sorting value to the sorting dict
+        sorting_dict[sorting_key][function_name] = sorting_val
+
+
 # Correct the offset among ranks
 true_time = min(all_init_times)
 offsets = [init_time - true_time for init_time in all_init_times]
-for function_name, rank_times in all_times.items():
-    for rank, timestamps in rank_times.items():
-        all_times[function_name][rank] = [timestamp - offsets[rank] - true_time for timestamp in timestamps]
+for function_name, function_times in all_times.items():
+    rank = int(function_name.split(" Rank ")[-1])
+    all_times[function_name] = [time - offsets[rank] - true_time for time in function_times]
 
 # Get the data for ALL functions before filtering down
 all_functions = list(all_times.keys())
 all_function_counts = np.array(list(function_total_counts.values()))
 all_function_names = np.array(list(function_total_counts.keys()))
+total_num_functions = len(all_function_names)
 max_sort_indices = np.flip(np.argsort(all_function_counts)) # to get in descending order
 sorted_names = all_function_names[max_sort_indices]
 
 # Only take functions in the top <percent>% of counts
-percent = 0.10
-num_pruned_functions = int(percent * len(all_function_names))
-pruned_functions = sorted_names[:num_pruned_functions]
+if total_num_functions > 100:
+    percent = 0.02
+    num_pruned_functions = int(percent * total_num_functions)
+    pruned_functions = sorted_names[:num_pruned_functions]
+    print(f"There are {len(all_functions)} total, but we filter down to the {num_pruned_functions} most frequent functions for analysis.")
 
-print(f"There are {len(all_functions)} total, but we filter down to the {num_pruned_functions} most frequent functions for analysis.")
-
+else:
+    pruned_functions = sorted_names
+    print(f"Keeping all {total_num_functions} functions for initial analysis.")
 
 ######################################################################################################################
 #################                                                                                    #################
@@ -200,19 +278,15 @@ function_analysis = {} # this can be simplified if we only care about PTM
 # Look at each target_function
 for target_function in pruned_functions:
 
-    # Initialize the list for all periods (regardless of rank) corresponding to the function
-    all_periods[target_function] = []
-
     # ----------------------------------------------------------------------------------------------------------------
     # BINS
 
     # Make sure that the function exists
     if target_function not in all_times:
         continue
-    function_times_dict = all_times[target_function]
 
     # Determine time range
-    all_target_times = np.concatenate(list(function_times_dict.values()))
+    all_target_times = all_times[target_function]
     min_time = np.min(all_target_times)
     max_time = np.max(all_target_times)
 
@@ -221,11 +295,9 @@ for target_function in pruned_functions:
         continue
 
     # Plot number of instances of each rank at each timestep
-    binned_data = {}
-    for rank in ranks_list:
-        timestamps = function_times_dict[rank]
-        counts, binned_times = np.histogram(timestamps, bins=num_bins)
-        binned_data[rank] = [binned_times, counts]
+    timestamps = all_target_times
+    counts, binned_times = np.histogram(timestamps, bins=num_bins)
+    binned_data = [binned_times, counts]
     #     plt.plot(binned_times[:-1], counts, label=f"Rank {rank}")
     # plt.suptitle(f"{app} Counts of {target_function} ({metaslice.capitalize()} phase)", fontweight="bold", fontsize=15)
     # plt.title(f"{num_bins} bins", style="italic")
@@ -242,100 +314,79 @@ for target_function in pruned_functions:
 
     print(target_function)
 
-    rank_periods = {}
     sum_periods = 0.
     max_freq = 0.
     max_mag = 0.
 
     # Protects against case where one rank is working while others aren't
-    present_ranks = [rank for rank in function_times_dict.keys() if function_times_dict[rank]]
     func_all_snr, func_all_ptm, func_all_std = [], [], []
-    function_analysis[target_function] = {}
 
     # Get period for each rank
-    for rank in present_ranks:
-        duration = max(function_times_dict[rank]) - min(function_times_dict[rank])
+    duration = max(timestamps) - min(timestamps)
 
-        if duration == 0:
-            continue
+    if duration == 0:
+        continue
 
-        sr = num_bins / duration
-        x = binned_data[rank][1]
-        X = fftshift(fft(x)) * sr / len(x)
-        N = len(X)
-        n = np.arange(N)
-        T = N/sr
-        freq = np.linspace(-sr/2, sr/2, N, endpoint=False)
+    sr = num_bins / duration
+    x = binned_data[1]
+    X = fftshift(fft(x)) * sr / len(x)
+    N = len(X)
+    n = np.arange(N)
+    T = N/sr
+    freq = np.linspace(-sr/2, sr/2, N, endpoint=False)
 
-        # Determine peak frequency (find highest freqs and see if they are peaks)
-        sorted_indices = np.argsort(np.abs(X))
-        peaks, _ = find_peaks(np.abs(X))
+    # Determine peak frequency (find highest freqs and see if they are peaks)
+    sorted_indices = np.argsort(np.abs(X))
+    peaks, _ = find_peaks(np.abs(X))
 
-        max_freq_index = sorted_indices[-2]  # set as default (ignoring peak at 0 Hz)
-        for i in range(sorted_indices.size - 1):
-            index = -2 - i
-            if sorted_indices[index] in peaks:
-                max_freq_index = sorted_indices[index]
-                break  # Something has gone right
-            if i > 5:
-                break  # Something has gone wrong
+    max_freq_index = sorted_indices[-2]  # set as default (ignoring peak at 0 Hz)
+    for i in range(sorted_indices.size - 1):
+        index = -2 - i
+        if sorted_indices[index] in peaks:
+            max_freq_index = sorted_indices[index]
 
-        peak_freq = np.abs(freq[max_freq_index])
-        peak_T = 1/peak_freq
-        peak_mag = np.abs(X)[max_freq_index]
-        point = [peak_freq, peak_mag]
+            # Now see if there is a similar peak at half of this frequency
+            next_indices = [index - j for j in range(1, 4)]
+            for next_index in next_indices:
+                if sorted_indices[next_index] in peaks and isclose(np.abs(freq[sorted_indices[next_index]]), np.abs(freq[max_freq_index] / 2), rel_tol=1e-2):
+                    max_freq_index = sorted_indices[next_index]
+                    break # Use the half frequency as the max
 
-        # calc_plot = plt.plot(freq, np.abs(X), label=f"Rank {rank} calculated freq: {peak_freq:.2f} Hz, period: {peak_T:.5f} s")
-        # color = calc_plot[0].get_color()
-        # plt.scatter(point[0], point[1], 60, marker="o", color="black", facecolors="none", label="Peak frequency" if rank == n_procs-1 else None)
+            break  # Use the original max_freq_index
 
-        snr = signal_to_noise(np.abs(X))
-        ptm = peak_mag / np.mean(np.abs(X))
-        std = np.std(np.abs(X))
-        if np.isnan(ptm):
-            ptm = 0
+        if i > 5:
+            break  # Something has gone wrong
 
-        rank_periods[rank] = peak_T
-        sum_periods += peak_T
+    peak_freq = np.abs(freq[max_freq_index])
+    # half_freq_index = np.where(freq == peak_freq / 2)
+    # print(f"np.abs(X)[half_freq_index]: {np.abs(X)[half_freq_index]}")
+    # print(f"np.abs(X)[max_freq_index]:  {np.abs(X)[max_freq_index]}")
+    # if np.abs(X)[half_freq_index] and isclose(np.abs(X)[half_freq_index], np.abs(X)[max_freq_index], rel_tol=1e-2):
+    #     max_freq_index = half_freq_index
+    peak_T = 1/peak_freq
+    peak_mag = np.abs(X)[max_freq_index]
+    point = [peak_freq, peak_mag]
 
-        if peak_freq > max_freq:
-            max_freq = peak_freq
+    snr = signal_to_noise(np.abs(X))
+    ptm = peak_mag / np.mean(np.abs(X))
+    std = np.std(np.abs(X))
+    if np.isnan(ptm):
+        ptm = 0
 
-        if peak_mag > max_mag:
-            max_mag = peak_mag
+    # rank_periods[rank] = peak_T
+    sum_periods += peak_T
 
-        func_all_snr.append(snr)
-        func_all_ptm.append(ptm)
-        func_all_std.append(std)
+    if peak_freq > max_freq:
+        max_freq = peak_freq
 
-    # Generate the FFT plot
-    # plt.xlabel("Frequency (Hz)")
-    # plt.ylabel("FFT Magnitude |X(freq)|")
-    # plt.suptitle(f"FFT of {target_function} Calls ({metaslice.capitalize()} phase)", fontweight="bold", fontsize=15)
-    # plt.title(f"{num_bins} bins", style="italic")
-    # plt.xlim(0, 3 * max_freq)
-    # plt.ylim(0, 2.5 * max_mag)
-    # plt.legend(loc="upper right")
-    # plt.grid(True)
-    # if save:
-    #     plt.savefig(f"{output_dir}/{n_procs}p_{n_steps}s_{target_function.replace('MPI_','').lower()}_{num_bins:.0e}bins_freq_{metaslice}.png")
-    # if target_function == "MPI_Allreduce":
-    # plt.show()
-    # plt.close()
+    if peak_mag > max_mag:
+        max_mag = peak_mag
 
-    # q1 = np.quantile(list(rank_periods.values()), 0.25)
-    # q3 = np.quantile(list(rank_periods.values()), 0.75)
-    # iqr = q3 - q1
-    # # low_threshold = q1 - iqr # could check for super fast ranks
-    # high_threshold = q3 + iqr
-    # outlier_ranks = []
-    # sum_periods_without_outliers = 0.
+    func_all_snr.append(snr)
+    func_all_ptm.append(ptm)
+    func_all_std.append(std)
 
-    for rank in present_ranks:
-        if rank not in rank_periods:
-            continue
-        period = rank_periods[rank]
-        all_periods[target_function].append(period)
+    all_periods[target_function] = peak_T
     #     if period > high_threshold:
     #         outlier_ranks.append(rank)
     #     else:
@@ -358,6 +409,25 @@ for target_function in pruned_functions:
     # average_period_without_outliers = sum_periods_without_outliers / (n_procs - len(outlier_ranks))
     print(f"  SNR = {func_avg_snr} || PTM = {func_avg_ptm} || STD = {func_avg_std}")
     # print(f"  Average period for {target_function} (excluding any outliers): {average_period_without_outliers}\n")
+
+    if "MPI" in target_function:
+        plt.figure()
+        plt.plot(freq, np.abs(X), label=f"Rank {int(target_function.split(' Rank ')[-1])} calculated freq: {peak_freq:.2f} Hz, period: {peak_T:.5f} s")
+        # color = calc_plot[0].get_color()
+        plt.scatter(point[0], point[1], 60, marker="o", color="black", facecolors="none", label="Peak frequency" if rank == n_procs-1 else None)
+
+        plt.xlabel("Frequency (Hz)")
+        plt.ylabel("FFT Magnitude |X(freq)|")
+        plt.suptitle(f"FFT of {target_function} Calls ({metaslice.capitalize()} phase)", fontweight="bold", fontsize=15)
+        plt.title(f"{num_bins} bins", style="italic")
+        plt.xlim(0, 3 * max_freq)
+        plt.ylim(0, 2.5 * max_mag)
+        plt.legend(loc="upper right")
+        plt.grid(True)
+        if save:
+            plt.savefig(f"{output_dir}/{n_procs}p_{n_steps}s_{target_function.replace('MPI_','').lower()}_{num_bins:.0e}bins_freq_{metaslice}.png")
+        # plt.show()
+        plt.close()
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Basic analysis
@@ -389,24 +459,19 @@ print(f"\nFound {len(periodic_functions)} periodic functions.")
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-avg_periods_per_function = []
-func_period_dict = {}
+periodic_function_periods = {}
 for periodic_function in periodic_functions:
     # print("periodic function:  ", periodic_function)
-    func_periods = []
-    for time in all_periods[periodic_function]:
-        # print("time: ", time)
-        func_periods.append(time)
-    func_period_dict[periodic_function] = np.mean(func_periods)
-    avg_periods_per_function.append(np.mean(func_periods))
+    periodic_function_periods[periodic_function] = int(all_periods[periodic_function] * 100000.0) / 100000.0
 
-print(f"Average period is {np.mean(avg_periods_per_function)}")
-print(f"Mode period is {mode(avg_periods_per_function)[0]}")
+print(f"Average period is {np.mean(list(periodic_function_periods.values()))}")
+print(f"Mode period is {mode(list(periodic_function_periods.values()))[0]}")
 
-period = mode(avg_periods_per_function)[0]
-for function, period in func_period_dict.items():
+for function, period in periodic_function_periods.items():
     print(f"  {function}: {period}")
-selected_functions = [function for function in periodic_functions if isclose(func_period_dict[function], period, rel_tol=0.001)]
+
+period = mode(list(periodic_function_periods.values()))[0]
+selected_functions = [function for function in periodic_functions if isclose(periodic_function_periods[function], period, rel_tol=0.001)]
 
 print(f"\nThe selected period is {period}.\nThe selected functions are {selected_functions}.")
 
@@ -428,26 +493,42 @@ print(f"\nThe selected period is {period}.\nThe selected functions are {selected
 
 print("\n------------------------------------------ META-SLICE IDENTIFICATION ------------------------------------------\n")
 
-all_loop_counts = []
-all_loop_starts = []
-all_loop_ends = []
+best_start = 0.
+best_end = 0.
+best_count = 0.
 
-all_macro_periods = []
-all_macro_starts = []
-all_macro_ends = []
+# Perform the analysis 50 times at different starting points
+num_starting_points = 50
+for i in range(num_starting_points):
+    starting_point = program_min_time + (i * period / num_starting_points)
+    print(f"Starting at {starting_point}")
 
-# Loop through each rank
-for periodic_function in selected_functions:
+    all_loop_counts = []
+    all_loop_starts = []
+    all_loop_ends = []
 
-    print(f"Finding meta slices for {periodic_function}\n")
+    all_macro_periods = []
+    all_macro_starts = []
+    all_macro_ends = []
 
-    macro_loop_counts = []
-    macro_loop_ends = []
-    macro_loop_starts = []
+    # Loop through each rank
+    for periodic_function in selected_functions:
 
-    for rank, times in all_times[periodic_function].items():
-        print(f"  Rank {rank}")
-        timesteps = np.arange(program_min_time, program_max_time, period)
+        # print(f"Finding meta slices for {periodic_function}\n")
+
+        macro_loop_counts = []
+        macro_loop_ends = []
+        macro_loop_starts = []
+
+        timesteps = np.arange(starting_point, program_max_time, period)
+
+        # Find the number of counts within some arbitrary time step, 2/3 of the way through the program
+        calibrating_step = timesteps[int(len(timesteps) - (len(timesteps) / 3))]
+        # print(f"{calibrating_step - period} <= {calibrating_step} < {calibrating_step + period}")
+        calibrating_count = sum(1 for time in all_times[periodic_function] if (calibrating_step - period) <= calibrating_step < calibrating_step + period)
+        plus_minus = int(0.001 * calibrating_count)
+        # print(f"Calibrating count for {periodic_function} at time {calibrating_step} is {calibrating_count}. Setting p/m to {plus_minus}.")
+
 
         old_count = 0
         old_loop_counter = 0
@@ -456,7 +537,6 @@ for periodic_function in selected_functions:
         loop_condition = 5 # number of consecutive identical timesteps required to consider it a loop
         loop_starts = []
         loop_ends = []
-        plus_minus = 10 # cushion for what is considered a loop
         longest_loop = [0.0, 0.0, 0] # [start, stop, count]
         for i in range(timesteps.size):
 
@@ -465,82 +545,93 @@ for periodic_function in selected_functions:
 
             previous_timestep = timesteps[i - 1]
             current_timestep = timesteps[i]
-            new_count = sum(1 for time in times if previous_timestep <= time < current_timestep)
+            new_count = sum(1 for time in all_times[periodic_function] if previous_timestep <= time < current_timestep)
 
             if old_count - plus_minus <= new_count <= old_count + plus_minus:
                 loop_counter += 1
                 # Arbitrary condition to determine if we're in the loop
                 if loop_counter == loop_condition and not in_loop:
                     in_loop = True
-                    print(f"  Entering loop at {timesteps[i - loop_condition]}")
-                    loop_start = timesteps[i - loop_condition]
+                    # print(f"  Entering loop at {timesteps[i - (loop_condition)]}")
+                    loop_start = timesteps[i - (loop_condition)]
                     loop_starts.append(loop_start)
-                elif in_loop:
-                    if loop_counter > longest_loop[2]:
-                        longest_loop[0] = loop_start
-                        longest_loop[1] = program_max_time # default val (will update if the loop during the run)
-                        longest_loop[2] = loop_counter
-            else:
-                if in_loop:
-                    print(f"    Exiting the loop at time {current_timestep} (new count is {new_count} and old count was {old_count})\n")
-                    in_loop = False
-                    loop_end = current_timestep
-                    loop_ends.append(loop_end)
+                elif in_loop and  loop_counter > longest_loop[2]:
+                    longest_loop[0] = loop_start
+                    longest_loop[1] = program_max_time # default val (will update if the loop during the run)
+                    longest_loop[2] = loop_counter
+            elif in_loop:
+                # print(f"    Exiting the loop at time {current_timestep} (new count is {new_count} and old count was {old_count})\n")
+                in_loop = False
+                loop_end = current_timestep
+                loop_ends.append(loop_end)
 
-                    if loop_start in longest_loop:
-                        longest_loop[1] = loop_end
+                if loop_start in longest_loop:
+                    longest_loop[1] = loop_end
 
-                    # Means there may be some macro-level structure
-                    if loop_counter == old_loop_counter:
-                        macro_loop_counts.append(loop_counter)
-                        macro_loop_ends.append(loop_end)
-                        macro_loop_starts.append(loop_start)
+                # Means there may be some macro-level structure
+                if loop_counter == old_loop_counter:
+                    macro_loop_counts.append(loop_counter)
+                    macro_loop_ends.append(loop_end)
+                    macro_loop_starts.append(loop_start)
 
-                    loop_counter = 0
+                loop_counter = 0
 
             old_loop_counter = loop_counter
             old_count = new_count
 
-    all_loop_counts.append(longest_loop[2])
-    all_loop_starts.append(longest_loop[0])
-    all_loop_ends.append(longest_loop[1])
+        all_loop_counts.append(longest_loop[2])
+        all_loop_starts.append(longest_loop[0])
+        all_loop_ends.append(longest_loop[1])
 
-    num_macro_slices = len(macro_loop_counts)
-    function_macro_slices = num_macro_slices > 0
+        num_macro_slices = len(macro_loop_counts)
+        function_macro_slices = num_macro_slices > 0
 
-    if function_macro_slices:
-        macro_period = np.mean(np.array(macro_loop_ends) - np.array(macro_loop_starts))
-        all_macro_periods.append(macro_period)
-        all_macro_starts.append(macro_loop_starts[0])
-        all_macro_ends.append(macro_loop_ends[-1])
+        if function_macro_slices:
+            macro_period = np.mean(np.array(macro_loop_ends) - np.array(macro_loop_starts))
+            all_macro_periods.append(macro_period)
+            all_macro_starts.append(macro_loop_starts[0])
+            all_macro_ends.append(macro_loop_ends[-1])
 
-    print()
-    print(f"  The program began at 0.0s. Loops began at times {loop_starts} and ended at times {loop_ends}. The program completed at {program_max_time}s.\n")
-    print(f"  The longest loop began at time {longest_loop[0]} and lasted {longest_loop[2]} periods (until {longest_loop[1]}).")
-    print(f"  {num_macro_slices} macro slices found.")
-    if function_macro_slices:
-        print(f"    Time between macro slices: {macro_period}")
-        print(f"    First macro slice began at {macro_loop_starts[0]}, and the last macro slice ended at {macro_loop_ends[-1]}.")
-    print(f"  Found {len(loop_starts)} loops total.")
-    print()
+        # print()
+        # print(f"  The program began at 0.0s. Loops began at times {loop_starts} and ended at times {loop_ends}. The program completed at {program_max_time}s.\n")
+        # print(f"  The longest loop began at time {longest_loop[0]} and lasted {longest_loop[2]} periods (until {longest_loop[1]}).")
+        # print(f"  {num_macro_slices} macro slices found.")
+        # if function_macro_slices:
+        #     print(f"    Time between macro slices: {macro_period}")
+        #     print(f"    First macro slice began at {macro_loop_starts[0]}, and the last macro slice ended at {macro_loop_ends[-1]}.")
+    #     print(f"  Found {len(loop_starts)} loops total.")
+    #     print()
 
-avg_num_loops = int(np.mean(all_loop_counts))
-avg_loop_start = np.mean(all_loop_starts)
-avg_loop_end = np.mean(all_loop_ends)
+    # print(f"\nnum loops: {all_loop_counts}")
+    # print(f"\nloop starts: {all_loop_starts}")
+    # print(f"\nloop ends: {all_loop_ends}")
 
-macro_slices = len(all_macro_periods) > 0
-if macro_slices:
-    avg_macro_period = np.mean(all_macro_periods)
-    avg_macro_start = np.mean(all_macro_starts)
-    avg_macro_end = np.mean(all_macro_ends)
+    avg_num_loops = mode(all_loop_counts)[0]
+    avg_loop_start = mode(all_loop_starts)[0]
+    avg_loop_end = mode(all_loop_ends)[0]
+
+    num_loops = int((avg_loop_end - avg_loop_start) / period)
+
+    if num_loops > best_count:
+        best_count = num_loops
+        best_start = avg_loop_start
+        best_end = avg_loop_end
+
+    macro_slices = len(all_macro_periods) > 0
+    if macro_slices:
+        avg_macro_period = np.mean(all_macro_periods)
+        avg_macro_start = np.mean(all_macro_starts)
+        avg_macro_end = np.mean(all_macro_ends)
+
+    # print(f"Period: {period}")
+    # print(f"The average number of iterations found among all periodic functions is {avg_num_loops}.")
+    # if macro_slices:
+    #     print(f"There are {(avg_macro_end - avg_macro_start) // avg_macro_period} macro-loops.")
+    print(f"  On average, the loop phase begins at {avg_loop_start} and ends at {avg_loop_end}\n-----\n")
+
 
 print("\n---------------------------------------------------------------------------------------------------------------\n")
-print(f"Period: {period}")
-print(f"The average number of iterations found among all periodic functions is {avg_num_loops}.")
-if macro_slices:
-    print(f"There are {(avg_macro_end - avg_macro_start) // avg_macro_period} macro-loops.")
-print(f"On average, the loop phase begins at {avg_loop_start} and ends at {avg_loop_end}\n")
-
+print(f"The best start is {best_start} and the best end is {best_end}, with {best_count} iterations.")
 
 ######################################################################################################################
 #################                                                                                    #################
@@ -550,8 +641,20 @@ print(f"On average, the loop phase begins at {avg_loop_start} and ends at {avg_l
 
 
 # Initialize info
-functions_to_plot = all_functions if plot_all_functions else selected_functions
+if plot_all_functions:
+    functions_to_plot = all_functions
+elif plot_filtered_functions:
+    functions_to_plot = pruned_functions
+else:
+    functions_to_plot = selected_functions
+reverse = True if sorting_key == "duration" else False
+functions_to_plot = sorted(functions_to_plot, reverse=reverse, key=lambda func: sort_functions(func, sorting_dict, sorting_key)) if sorting_key is not None else functions_to_plot
+# print(f"\nTop Ten Functons:\n{functions_to_plot[:10]}")
+# print(f"\n'Mini-EM' is at {functions_to_plot.index('Mini-EM')}")
+# print(f"\n'Mini-EM: Total Time' is at {functions_to_plot.index('Mini-EM: Total Time')}")
 increment = 1.0 / len(functions_to_plot)
+if output_proc != -1:
+  increment *= n_procs
 target_function_labels = []
 target_increments = []
 
@@ -560,91 +663,129 @@ background_colors = colormaps["Greys_r"](np.linspace(0, 1, n_procs + 1))
 
 # Generate plots
 plt.figure()
-mpi_iter, kokkos_iter, collective_iter = 0, 0, 0
 colors = ["tab:blue", "tab:orange", "tab:green", "tab:red"]
-for rank in ranks_list:
+iter = 1
+mini_em_iter = 0
+plotted_ranks = {r: {"rank_iter": 0, "mpi_iter": 0, "kokkos_iter": 0, "collective_iter": 0} for r in ranks_list}
 
-    # Only plot specified rank(s)
+# Loop through all functions called by the current rank
+for function in functions_to_plot:
+    current_increment = iter * increment
+    rank = int(function.split("Rank ")[-1])
+
     if output_proc == -1 or rank == output_proc:
-        iter = 1
 
-        # Loop through all functions called by the current rank
-        for function in functions_to_plot:
-            current_increment = iter * increment
+        # Get the data for the current function at the current rank
+        times_list = all_times[function]
+        x_data = np.array(times_list)
 
-            # Get the data for the current function at the current rank
-            times_list = all_times[function][rank]
-            x_data = np.array(times_list)
+        # Plot at arbitrary y-value
+        y_data = np.zeros_like(x_data) + current_increment
+        size = [10] * len(times_list)
 
-            # Plot at arbitrary y-value
-            y_data = np.zeros_like(x_data) + current_increment
-            size = [10] * len(times_list)
+        # Determine if this is the target rank (and if so, color the datapoints)
+        if plot_all_functions or plot_filtered_functions:
 
-            # Determine if this is the target rank (and if so, color the datapoints)
-            if plot_all_functions:
+            # if function.split(" Path ")[0] in all_collectives:
+            #         label = f"Rank {rank} Collective MPI Call" if plotted_ranks[rank]["collective_iter"] == 0 else None
+            #         color = colors[rank]
+            #         alpha = 1.0
+            #         plotted_ranks[rank]["collective_iter"] += 1
 
-                if rank == output_proc or rank == target_proc:
-                    mpi = True if "MPI_" in function else False
-                    if mpi:
-                        if function in all_collectives:
-                            label = f"Rank {rank} Collective MPI Call" if collective_iter == 0 else None
-                            color = "tab:green"
-                            collective_iter += 1
-                        else:
-                            label = f"Rank {rank} MPI Call" if mpi_iter == 0 else None
-                            color = "tab:blue"
-                            mpi_iter += 1
-                    else:
-                        label = f"Rank {rank} Kokkos Call" if kokkos_iter == 0 else None
-                        color = "tab:orange"
-                        kokkos_iter += 1
+            # else:
+            #     label = f"Rank {rank} Call" if plotted_ranks[rank]["rank_iter"] == 0 else None
+            #     color = background_colors[rank]
+            #     alpha = 0.7
+            #     plotted_ranks[rank]["rank_iter"] += 1
+
+            # if function.startswith("Mini-EM: Advance Time Step"):
+            #     label = "Mini-EM: Advance Time Step" if mini_em_iter == 0 else None
+            #     mini_em_iter += 1
+            #     alpha = 1.0
+            #     color = "purple"
+
+            mpi = True if "MPI_" in function else False
+            if mpi:
+                if function.split(" Path ")[0] in all_collectives:
+                    label = None
+                    color = colors[2] if output_proc != -1 else adjust_lightness(colors[rank], amount = 0.75)
+                    alpha=1.0
+                    # plotted_ranks[rank]["collective_iter"] += 1
                 else:
-                    label = f"Rank {rank}" if iter == 1 else None
-                    color = background_colors[rank]
+                    label = f"Rank {rank}" if plotted_ranks[rank]["rank_iter"] == 0 else None
+                    plotted_ranks[rank]["rank_iter"] += 1
+                    color = colors[0] if output_proc != -1 else colors[rank]
+                    alpha=1.0
+                    # plotted_ranks[rank]["mpi_iter"] += 1
             else:
-                # Create y-axis labels
-                if function not in target_function_labels:
-                    target_function_labels.append(function)
-                    target_increments.append(current_increment)
+                label = None
+                color = colors[1] if output_proc != -1 else adjust_lightness(colors[rank], amount = 1.5)
+                alpha=1.0
+                # plotted_ranks[rank]["kokkos_iter"] += 1
 
-                # Then create the plot
-                label = f"Rank {rank}" if iter == 1 else None
-                color = colors[rank]
+            if function.startswith("Mini-EM: Advance Time Step"):
+                label = "Mini-EM: Advance Time Step" if mini_em_iter == 0 else None
+                mini_em_iter += 1
+                color = "purple"
+                alpha=1.0
 
-            # Create time plots
-            if vertical_plot:
-                plt.scatter(y_data, x_data, size, color=color, label=label)
-            else:
-                plt.scatter(x_data, y_data, size, color=color, label=label)
+        else:
+            # Create y-axis labels
+            if function not in target_function_labels:
+                target_function_labels.append(function)
+                target_increments.append(current_increment)
 
-            # Update iter so rank label only prints once and y-vals are different
-            iter += 1
+            # Then create the plot
+            label = f"Rank {rank}" if plotted_ranks[rank]["rank_iter"] == 0 else None
+            plotted_ranks[rank]["rank_iter"] += 1
+            color = colors[rank]
+            alpha = 1.0
 
-    # Ignore ranks that user did not specify
-    else:
-      continue
+        # Create time plots
+        if vertical_plot:
+            plt.scatter(y_data, x_data, size, color=color, alpha=alpha, label=label)
+        else:
+            plt.scatter(x_data, y_data, size, color=color, alpha=alpha, label=label)
+
+        # Update iter so rank label only prints once and y-vals are different
+        iter += 1
+
+# Create explainer label
+target_function_labels = [label.split(" Path ")[0] for label in target_function_labels]
 
 # Format legend box
 if vertical_plot:
     plt.legend(loc="lower right")
     plt.xlim(0 - (2 * increment),(1 + (2 * increment)))
     plt.ylim(program_max_time + 1., -1.)
-    plt.xticks(target_increments, target_functions_labels)
+    plt.xticks(target_increments, target_function_labels)
     plt.xticks(rotation=65)
     plt.ylabel("Time (s)")
 else:
-    num_labels = len(plt.gca().get_legend_handles_labels()[1])
-    plt.legend(loc="upper right", ncols=num_labels//3)
+    ax = plt.gca()
+    num_labels = len(ax.get_legend_handles_labels()[1])
+    # box = ax.get_position()
+    # ax.set_position([box.x0, box.y0 + box.height * 0.1,
+    #                 box.width, box.height * 0.9])
+    # ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+    #           fancybox=True, shadow=True, ncol=num_labels // 3)
+    plt.legend(loc="upper right", ncols=2, title="Dark: Collective Call\nMedium: Standard MPI Call\nLight: Kokkos Call\n")
     plt.xlim(program_min_time, program_max_time)
     plt.ylim(0,(1 + (2 * increment)))
     plt.yticks(target_increments, target_function_labels)
     plt.xlabel("Time (s)")
+    plt.ylabel(yaxis_label)
 
-# Add timestep divisions if requrested
-caption = f"Found {avg_num_loops} iterations with a period of {period:.4f} s\nEach loop is represented with a black line."
+# Add timestep divisions if requested
 if draw_timesteps:
-    for timestep in np.arange(avg_loop_start, avg_loop_end, period):
+    num_drawn_steps = 0
+    for timestep in np.arange(best_start, best_end, period):
+        if timestep == best_end:
+            continue
         plt.plot([timestep, timestep],[0., 1.], color="black", alpha=0.5)
+        num_drawn_steps += 1
+    print(f"Plotted {num_drawn_steps - 1} time steps.") # subtract one because it draws a line at the end of the last time step
+    caption = f"Found {num_drawn_steps - 1} iterations with a period of {period:.4f} s\nThe start and end of each loop is shown with a black line."
     t = plt.figtext(0.15, 0.82, caption, wrap=True, horizontalalignment="left", fontsize=10)
     t.set_bbox(dict(facecolor="white", alpha=0.5, linewidth=0))
 if draw_macroloops and macro_slices:
