@@ -5,10 +5,6 @@ import os
 import json
 import argparse
 import numpy as np
-from scipy.fft import fft, fftfreq, fftshift
-from collections import Counter
-import matplotlib.pyplot as plt
-from matplotlib import colormaps
 
 
 """
@@ -21,10 +17,10 @@ Steps to recreate:
         - MiniEM:    mpirun -n 4 ./PanzerMiniEM_BlockPrec.exe --numTimeSteps=10
         - ExaMiniMD: mpirun -np 4 -bind-to socket ./ExaMiniMD -il ../input/in.lj --comm-type MPI --kokkos-map-device-id-by=mpi_rank
         - ExaMPM:    mpirun -n 4 ./DamBreak 0.05 2 0 0.1 1.0 10 serial
-  - touch em_4p_100s_alltrace.json
-        - Format: <app>_<num_procs>p_<num_steps>s_<all/mpi>trace.json)
-  - cali-query -q "SELECT * FORMAT json" *.cali | tee em_4p_100s_alltrace.json
-  - <move resulting json to this directory>
+  - cali-query -q "SELECT * FORMAT json" alltrace-<rank>.cali | tee <filename>.json
+        - <filename> Formatting: <app>_<rank>r_<num_steps>s_<misc>.json)
+        - Example: em_0r_100s_kokkostrace.json
+  - mv <filename> ${WORKVIZ_DIR}/data
 """
 
 

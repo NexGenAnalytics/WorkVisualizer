@@ -14,17 +14,30 @@ class DataPruner:
 
         # Initialize the depth of the call graph
         self.current_depth = 0
+        self.max_depth = 0
 
         # Initialize json data
         self.json_data = input_data
+
+        # Becomes true once we hit the first "event.begin"
+        self.first_begin = False
 
 
     def parse_json(self):
         """
         To correctly match ends to begins, make sure that the data is sorted so that every 'end' occurs AFTER its corresponding 'begin' (ORDER BY time.offset)
         """
+        iter = 0
+        total = len(self.json_data)
+
         # Loop through all events to get necessary data
         for event in self.json_data:
+
+            if self.current_depth > self.max_depth:
+                self.max_depth = self.current_depth
+
+            if event["mpi.rank"] != self.rank:
+                continue
 
             # Perform a sanity check
             assert self.rank == event["mpi.rank"]
@@ -33,19 +46,20 @@ class DataPruner:
             # Also identify if it is beginning or ending the event
             begin = False
             if "event.begin#mpi.function" in event:
-                begin = True
+                begin, self.first_begin = True, True
                 function_name = event["event.begin#mpi.function"]
             elif "event.begin#region" in event:
-                begin = True
+                begin, self.first_begin = True, True
                 function_name = event["event.begin#region"]
-            elif "event.end#mpi.function" in event:
-                function_name = event["event.end#mpi.function"]
-            elif "event.end#region" in event:
-                function_name = event["event.end#region"]
             else:
-                continue
-
-            print(event)
+                if not self.first_begin: # Need to start on a "begin" or the algorithm doesn't make sense
+                    continue
+                elif "event.end#mpi.function" in event:\
+                    function_name = event["event.end#mpi.function"]
+                elif "event.end#region" in event:
+                    function_name = event["event.end#region"]
+                else:
+                    continue
 
             # Get the event time in seconds
             if "time.offset.ns" in event:
@@ -53,7 +67,7 @@ class DataPruner:
             elif "time.offset" in event:
                 event_time = event["time.offset"]
             else:
-                raise ValueError("Could not identify time.offset[].ns] value in event.")
+                raise ValueError("Could not identify time.offset[].ns value in event.")
 
             # Get the kernel_type and store for later
             if "kernel_type" in event:
@@ -66,6 +80,12 @@ class DataPruner:
                 path = event["path"]
             else:
                 path = ""
+
+            if "Kokkos Profile Tool Fence" in function_name or path.count("/") > 5:
+                continue
+
+            print(f"{iter}/{total}")
+            print(event)
 
             # ----------------------------------------- BEGIN PAIRING PROCESS -----------------------------------------
 
@@ -130,9 +150,12 @@ class DataPruner:
                     self.unpaired_ends.append(event_footprint)
 
             print()
+            iter += 1
 
         # Make sure all ends have been matched to a beginning
-        assert len(self.unpaired_ends) == 0
+        # assert len(self.unpaired_ends) == 0
+        print(f"There are {len(self.unpaired_ends)} unpaired endings.")
+        print(f"The maximum depth is {self.max_depth}.")
 
         # Finally, return the new JSON
         return self.pruned_json
@@ -158,12 +181,12 @@ def main():
         app = "MiniEM"
     else:
         app = app_abr
-    rank = int(file_splits[1].split("r")[0])
+    rank = int(file_splits[1].split("r")[0]) if "r_" in json_file else 0
     n_steps = int(file_splits[2].split("s")[0])
 
     # Create save directory
     current_dir = os.getcwd()
-    output_dir = os.path.join(current_dir, "data", app)
+    output_dir = os.path.join(current_dir, "data", "pruned")
     os.makedirs(output_dir, exist_ok=True)
 
     # Read in all data

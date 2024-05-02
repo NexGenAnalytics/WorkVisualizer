@@ -23,6 +23,7 @@ These instructions explain how to generate a data dump for any given application
 The steps assume that the top-level of the Work Visualizer repository has been exported to `$WORKVIZ_DIR`.
 
 1. Install [Caliper](https://github.com/LLNL/Caliper) and add `bin/cali-query` to `$PATH`
+_Note: At least for the moment, Caliper must be installed in Debug mode._
 
 2. Export the following environment variables
 
