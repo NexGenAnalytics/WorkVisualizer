@@ -1,4 +1,5 @@
 # app/index.py
+import json
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
@@ -30,3 +31,10 @@ sales_data = [
 @app.get("/api/sales", response_model=List[Sale])
 def get_sales():
     return sales_data
+
+@app.get("/api/tree")
+def get_tree_data():
+    filename = "../../../data/pruned/md_0r_100s_pruned.json"
+    with open(filename) as f:
+        tree_data = json.load(f)
+    return tree_data
