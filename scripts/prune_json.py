@@ -4,7 +4,7 @@ import argparse
 
 class DataPruner:
 
-    def __init__(self, input_data: dict, rank: int):
+    def __init__(self, input_data: dict, rank: int, time_range: tuple = None):
         # Initialize the necessary lists
         self.pruned_json = []
         self.unpaired_ends = []
@@ -22,6 +22,12 @@ class DataPruner:
         # Becomes true once we hit the first "event.begin"
         self.first_begin = False
 
+        # Determine if we are only looking within a specific time range
+        self.time_range = False
+        if time_range is not None:
+            self.start_time = time_range[0]
+            self.end_time = time_range[1]
+            self.time_range = True
 
     def parse_json(self):
         """
@@ -68,6 +74,10 @@ class DataPruner:
                 event_time = event["time.offset"]
             else:
                 raise ValueError("Could not identify time.offset[].ns value in event.")
+
+            # Enforce the time constraints (if present)
+            if self.time_range and not (self.start_time <= event_time <= self.end_time):
+                continue
 
             # Get the kernel_type and store for later
             if "kernel_type" in event:
@@ -131,7 +141,12 @@ class DataPruner:
                           beginning["kernel_type"] == kernel_type and \
                           comp_path == path:
                               beginning["end_time"] = event_time
-                              beginning["duration"] = event_time - beginning["begin_time"]
+
+                              # Since we're closing the event, if it doesn't have children now it never will
+                              if beginning["children"] == []:
+                                del beginning["children"]
+                                beginning["duration"] = event_time - beginning["begin_time"]
+
                               paired = True
                               break
 
@@ -157,6 +172,9 @@ class DataPruner:
         print(f"There are {len(self.unpaired_ends)} unpaired endings.")
         print(f"The maximum depth is {self.max_depth}.")
 
+        # Add the "main" function:
+        self.pruned_json = {"name": "main", "children": self.pruned_json}
+
         # Finally, return the new JSON
         return self.pruned_json
 
@@ -165,8 +183,19 @@ def main():
     # Parse arguments
     parser = argparse.ArgumentParser(description="Takes in the path to an executable and returns a visualization of the Kokkos kernels.")
     parser.add_argument("-i", "--input", help="Input JSON file containing MPI traces for all ranks.")
+    parser.add_argument("-start", "--start_time", default=None, help="Beginning of time range of desired calls (i.e. beginning of a loop)")
+    parser.add_argument("-end", "--end_time", default=None, help="End of time range of desired calls (i.e. end of a loop)")
     args = parser.parse_args()
     json_file = args.input
+    start = float(args.start_time) if args.start_time is not None else None
+    end = float(args.end_time) if args.end_time is not None else None
+
+    # Create the desired time range
+    time_range = (start, end) if start is not None and end is not None else None
+
+    # Print a warning if the user gives a start and not end (or vice versa)
+    if (start is not None or end is not None) and (end is None or start is None):
+        print("Warning: Must provide both start and end times to specify the time range.")
 
     # Get problem info
     file_splits = json_file.split("_")
@@ -195,7 +224,7 @@ def main():
     json_data = json.load(f)
 
     # Create DataPruner instance
-    pruner = DataPruner(json_data, rank)
+    pruner = DataPruner(json_data, rank, time_range=time_range)
     pruned_json = pruner.parse_json()
 
     output_path = f"{output_dir}/{app_abr}_{rank}r_{n_steps}s_pruned.json"

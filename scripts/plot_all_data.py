@@ -116,7 +116,7 @@ elif app_abr == "em" or app_abr == "miniem":
     app = "MiniEM"
 else:
     app = app_abr
-n_procs = int(file_splits[1].split("p")[0])
+n_procs = int(file_splits[1].split("p")[0]) if "p_" in json_file else 1
 n_steps = int(file_splits[2].split("s")[0])
 
 # Determine sorting key
