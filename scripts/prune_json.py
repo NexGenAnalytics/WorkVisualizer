@@ -29,15 +29,22 @@ class DataPruner:
             self.end_time = time_range[1]
             self.time_range = True
 
+        self.read_next_event = False
+        self.previous_function_name = ""
+
     def parse_json(self):
         """
         To correctly match ends to begins, make sure that the data is sorted so that every 'end' occurs AFTER its corresponding 'begin' (ORDER BY time.offset)
         """
         iter = 0
+        begin_counter, end_counter = 0,0
         total = len(self.json_data)
+        unpaired_begins = []
 
         # Loop through all events to get necessary data
-        for event in self.json_data:
+        for i in range(len(self.json_data)):
+
+            event = self.json_data[i]
 
             if self.current_depth > self.max_depth:
                 self.max_depth = self.current_depth
@@ -57,15 +64,12 @@ class DataPruner:
             elif "event.begin#region" in event:
                 begin, self.first_begin = True, True
                 function_name = event["event.begin#region"]
+            elif "event.end#mpi.function" in event:
+                function_name = event["event.end#mpi.function"]
+            elif "event.end#region" in event:
+                function_name = event["event.end#region"]
             else:
-                if not self.first_begin: # Need to start on a "begin" or the algorithm doesn't make sense
-                    continue
-                elif "event.end#mpi.function" in event:\
-                    function_name = event["event.end#mpi.function"]
-                elif "event.end#region" in event:
-                    function_name = event["event.end#region"]
-                else:
-                    continue
+                continue
 
             # Get the event time in seconds
             if "time.offset.ns" in event:
@@ -91,8 +95,48 @@ class DataPruner:
             else:
                 path = ""
 
+            # Get the size, src, or dst of an MPI Send or Recv
+            dst, src, size = None, None, None
+            if "MPI_Send" in function_name or "MPI_Isend" in function_name:
+
+                # Find the next corresponding event with the dst info
+                for j in range(1, len(self.json_data) - i):
+                    next_event = self.json_data[i+j]
+                    if "mpi.msg.dst" in next_event:
+                        dst = next_event["mpi.msg.dst"]
+                        size = next_event["mpi.msg.size"]
+                        break
+
+                    # Shouldn't take this long to find the match
+                    elif j > 10:
+                        break
+
+            if "MPI_Recv" in function_name or "MPI_Irecv" in function_name:
+
+                # Find the next corresponding event with the src info
+                for j in range(1, len(self.json_data) - i):
+                    next_event = self.json_data[i+j]
+                    if "mpi.msg.src" in next_event:
+                        src = next_event["mpi.msg.src"]
+                        size = next_event["mpi.msg.size"]
+                        break
+
+                    # Shouldn't take this long to find the match
+                    elif j > 10:
+                        break
+
+            # General filtering
             if "Kokkos Profile Tool Fence" in function_name or path.count("/") > 5:
                 continue
+
+            # Keep track of how many begins and ends there are
+            if begin:
+                begin_counter += 1
+            else:
+                end_counter += 1
+                # Need to start on a "begin" or the algorithm doesn't make sense
+                if not self.first_begin:
+                    continue
 
             print(f"{iter}/{total}")
             print(event)
@@ -104,11 +148,27 @@ class DataPruner:
             if begin:
                 event_footprint = {
                     "name": function_name,
+                    "rank": event["mpi.rank"],
                     "begin_time": event_time,
                     "kernel_type": kernel_type,
                     "path": path,
                     "children": []
                 }
+
+                # Add send destination if applicable
+                if "MPI_Send" in function_name or "MPI_Isend" in function_name:
+                    if dst is not None:
+                        event_footprint["dst"] = dst
+                    if size is not None:
+                        event_footprint["size"] = size
+
+                # Add recv source if applicable
+                if "MPI_Recv" in function_name or "MPI_Irecv" in function_name:
+                    if src is not None:
+                        event_footprint["src"] = src
+                    if size is not None:
+                        event_footprint["size"] = size
+
                 if self.current_depth > 0:
                     current_list = self.pruned_json
                     for _ in range(self.current_depth):
@@ -171,6 +231,9 @@ class DataPruner:
         # assert len(self.unpaired_ends) == 0
         print(f"There are {len(self.unpaired_ends)} unpaired endings.")
         print(f"The maximum depth is {self.max_depth}.")
+
+        print()
+        print(f"There are {begin_counter} begins and {end_counter} ends.")
 
         # Add the "main" function:
         self.pruned_json = {"name": "main", "children": self.pruned_json}

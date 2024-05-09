@@ -103,7 +103,7 @@ const SunBurst = ({ data }) => {
             return +this.getAttribute("fill-opacity") || arcVisible(d.target);
             })
             .attr("fill-opacity", d => arcVisible(d.target) ? (d.children ? 0.6 : 0.4) : 0)
-            .attr("pointer-events", d => arcVisible(d.target) ? "auto" : "none") 
+            .attr("pointer-events", d => arcVisible(d.target) ? "auto" : "none")
 
             .attrTween("d", d => () => arc(d.current));
 
@@ -113,7 +113,7 @@ const SunBurst = ({ data }) => {
             .attr("fill-opacity", d => +labelVisible(d.target))
             .attrTween("transform", d => () => labelTransform(d.current));
         }
-        
+
         function arcVisible(d) {
         return d.y1 <= 3 && d.y0 >= 1 && d.x1 > d.x0;
         }

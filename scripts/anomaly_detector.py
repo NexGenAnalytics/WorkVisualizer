@@ -10,7 +10,7 @@ Takes in data for one of the following:
 
 Then looks for anomalous behavior using the techniques developed in the plotting script.
 
-Data should be formatted like:
+Input filename should be formatted like:
 - One rank (all timesteps) -> <app>_<rank>r_<n_steps>s_<misc>.json
 - All ranks (one timestep) -> <app>_<n_procs>p_<step>s_<misc>.json
 
@@ -72,7 +72,10 @@ class AnomalyDetector:
                 step_iter += 1
 
             # this isn't great--it would be better to determine the pattern of functions
-            
+            #
+            # for example: [ A E A C D E F A D A B E D A B E D A B E D A C E ]
+            #   - where each letter represents a different function
+            #   - should be able to find [ A B E D ] as the pattern
 
         # Then look at the case of all ranks working on one timestep
         else:
@@ -108,6 +111,18 @@ class AnomalyDetector:
 
             return imbalance, self.imb_dict
 
+    def detect(self):
+        # First look for imbalance
+        imb = self.find_imbalance()
+
+        # Then look for anyting else
+        # bottleneck = self.find_bottleneck()
+
+        # Package all anomalies into one container
+        anomaly = imb
+
+        # Then return whatever we found
+        return anomalies
 
 def main():
     # Parse command line arguments
@@ -146,3 +161,6 @@ def main():
 
     # Create AnomalyDetector instance
     anomaly_detector = AnomalyDetector(json_data, rank_info, step_info, one_rank_all_steps)
+
+    # Find any anomalies
+    anomalies = anomaly_detector.detect()

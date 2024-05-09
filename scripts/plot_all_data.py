@@ -3,6 +3,7 @@
 
 import os
 import json
+import pandas as pd
 import argparse
 import numpy as np
 from math import isclose
@@ -190,7 +191,7 @@ for event in json_data:
 
     # Append the depth of the path to the function name
     if "path" in event:
-        if event['path'].count('/') + 1 < 10:
+        if event['path'].count('/') + 1 > 20:
             continue
         function_name += f" Path {event['path'].count('/') + 1}"
     else:
@@ -498,7 +499,7 @@ best_end = 0.
 best_count = 0.
 
 # Perform the analysis 50 times at different starting points
-num_starting_points = 50
+num_starting_points = 5
 for i in range(num_starting_points):
     starting_point = program_min_time + (i * period / num_starting_points)
     print(f"Starting at {starting_point}")
@@ -668,10 +669,21 @@ iter = 1
 mini_em_iter = 0
 plotted_ranks = {r: {"rank_iter": 0, "mpi_iter": 0, "kokkos_iter": 0, "collective_iter": 0} for r in ranks_list}
 
+# global_data = [[],[],[]]
+path = 0
+paths = []
+
 # Loop through all functions called by the current rank
 for function in functions_to_plot:
+
     current_increment = iter * increment
     rank = int(function.split("Rank ")[-1])
+
+    # Create the red lines to demonstrate path
+    path_number = int(function.split(" Path ")[1].split(" ")[0])
+    if path_number > path:
+        paths.append(current_increment)
+        path = path_number
 
     if output_proc == -1 or rank == output_proc:
 
@@ -682,6 +694,15 @@ for function in functions_to_plot:
         # Plot at arbitrary y-value
         y_data = np.zeros_like(x_data) + current_increment
         size = [10] * len(times_list)
+
+        # allreduces = np.zeros_like(x_data) if "MPI_Allreduce" not in function else np.ones(x_data.shape)
+
+        # allreduce_weight = 20 if "MPI_Allreduce" in function else 1
+        # for _ in range(allreduce_weight):
+        #     global_data[0].extend(x_data.tolist())
+        #     global_data[1].extend(y_data.tolist())
+        #     global_data[2].extend(allreduces.tolist())
+
 
         # Determine if this is the target rank (and if so, color the datapoints)
         if plot_all_functions or plot_filtered_functions:
@@ -750,6 +771,12 @@ for function in functions_to_plot:
         # Update iter so rank label only prints once and y-vals are different
         iter += 1
 
+# df = pd.DataFrame()
+# df["time"] = global_data[0]
+# df["depth"] = global_data[1]
+# df["allreduce"] = global_data[2]
+# df.to_csv(f"{app_abr}_data.csv", header=False, index=False)
+
 # Create explainer label
 target_function_labels = [label.split(" Path ")[0] for label in target_function_labels]
 
@@ -776,6 +803,10 @@ else:
     plt.xlabel("Time (s)")
     plt.ylabel(yaxis_label)
 
+# Draw the path lines
+for path_height in paths:
+    plt.plot([program_min_time, program_max_time], [path_height, path_height], color="purple", alpha=0.5)
+
 # Add timestep divisions if requested
 if draw_timesteps:
     num_drawn_steps = 0
@@ -785,7 +816,7 @@ if draw_timesteps:
         plt.plot([timestep, timestep],[0., 1.], color="black", alpha=0.5)
         num_drawn_steps += 1
     print(f"Plotted {num_drawn_steps - 1} time steps.") # subtract one because it draws a line at the end of the last time step
-    caption = f"Found {num_drawn_steps - 1} iterations with a period of {period:.4f} s\nThe start and end of each loop is shown with a black line."
+    caption = f"Found {num_drawn_steps - 1} iterations with a period of {period:.4f} s\nThe start and end of each loop is shown with a black line.\nEach new level in the path is shown with a purple line."
     t = plt.figtext(0.15, 0.82, caption, wrap=True, horizontalalignment="left", fontsize=10)
     t.set_bbox(dict(facecolor="white", alpha=0.5, linewidth=0))
 if draw_macroloops and macro_slices:

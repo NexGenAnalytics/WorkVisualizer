@@ -15,10 +15,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/api/tree")
-def get_tree_data():
+@app.get("/api/spacetime")
+def get_spacetime_data():
     print("Getting Data!")
-    filename = "../../../data/pruned/md_0r_100s_pruned.json"
+    filename = "../../../data/d3_scatter/md_0r_100s_pruned_scatter.json"
     with open(filename) as f:
-        tree_data = json.load(f)
-    return tree_data
+        spacetime_data = json.load(f)
+    return spacetime_data
