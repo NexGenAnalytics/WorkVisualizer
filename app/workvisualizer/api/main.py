@@ -15,25 +15,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-class Sale(BaseModel):
-    month: str
-    sales: int
-
-
-sales_data = [
-    {"month": "January", "sales": 150},
-    {"month": "February", "sales": 200},
-    {"month": "March", "sales": 170},
-]
-
-
-@app.get("/api/sales", response_model=List[Sale])
-def get_sales():
-    return sales_data
-
 @app.get("/api/tree")
 def get_tree_data():
+    print("Getting Data!")
     filename = "../../../data/pruned/md_0r_100s_pruned.json"
     with open(filename) as f:
         tree_data = json.load(f)

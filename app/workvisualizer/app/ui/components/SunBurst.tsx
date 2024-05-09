@@ -33,8 +33,8 @@ const SunBurst = ({ data }) => {
             .endAngle(d => d.x1)
             .padAngle(d => Math.min((d.x1 - d.x0) / 2, 0.005))
             .padRadius(radius * 1.5)
-            .innerRadius(d => d.y0 * radius)
-            .outerRadius(d => Math.max(d.y0 * radius, d.y1 * radius - 1))
+            .innerRadius(d => d.y0 * radius * 0.3)
+            .outerRadius(d => Math.max(d.y0 * radius, d.y1 * radius - 1) * 0.8)
 
         // Create the SVG container.
         svg.attr("viewBox", [-width / 2, -height / 2, width, width]).style("font", "10px sans-serif");
@@ -124,7 +124,7 @@ const SunBurst = ({ data }) => {
 
         function labelTransform(d) {
         const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
-        const y = (d.y0 + d.y1) / 2 * radius;
+        const y = (d.y0 + d.y1) / 2 * radius * 0.5;
         return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
         }
     }, [data]);

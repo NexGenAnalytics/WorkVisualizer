@@ -1,21 +1,18 @@
-import SunBurst from '../components/SunBurst';
+import React from "react";
+import {Button} from "@nextui-org/react";
+import Link from 'next/link'
 
-export default async function Page() {
-    const data = await getData()
+export default function Page() {
     return (
-        <div>
-            <h1>Sales Data</h1>
-            <SunBurst data={data} />
-        </div>
+        <main className="flex min-h-screen flex-col p-6 bg-gradient-to-r from-indigo-800 to-indigo-900">
+            <div className="backdrop-blur-sm bg-white/30 p-5 rounded-lg bg-slate-500 min-w-20">
+                <h1>Work Visualizer</h1>
+            </div>
+            <div>
+                <Link href="/dashboard">
+                    <Button>Go to Dashboard</Button>
+                </Link>
+            </div>
+        </main>
     );
-};
-
-async function getData() {
-    const res = await fetch('http://127.0.0.1:8000/api/tree')
-
-    if (!res.ok) {
-        throw new Error('Failed to fetch data')
-    }
-
-    return res.json()
 }
