@@ -51,11 +51,14 @@ def time_constraint(begin_time, metaslice):
     else:
         return begin_time > 0
 
-def sort_functions(function_name, sorting_dict, sorting_key):
-    # Average across all ranks
-    if sorting_key not in sorting_dict:
-        raise ValueError(f"{sorting_key} not recognized. Use 'path' or 'duration'.")
-    return np.mean(sorting_dict[sorting_key][function_name])
+def sort_functions(event_dict):
+    path = event_dict["path"]
+    if path == "":
+        return 0
+    elif path.count("/") == 0:
+        return 1
+    else:
+        return path.count("/") + 1
 
 def flatten_events(event_dict):
     total_flattened_list = []
@@ -160,10 +163,12 @@ increment = 1.0 / len(flattened_events)
 known_increments = {}
 
 # Sort the JSON by path
-print(flattened_events[:10])
-sorted_events = sorted(flattened_events, reverse=True, key=lambda x: (x["path"] == "", x["path"].count("/") + 1))
-print()
-print(sorted_events[:10])
+# print(flattened_events[:10])
+sorted_events = sorted(flattened_events, reverse=True, key=sort_functions)
+for event in sorted_events:
+    print(event["path"].count("/"))
+# print()
+# print(sorted_events[:10])
 # Then create a json with the relevant info
 iter = 1
 for event in sorted_events:
@@ -187,9 +192,8 @@ for event in sorted_events:
 
     # Then we need to determine the y value for this function
 
-    # Create a temporary name that includes the path depth and rank
-    path_depth = event["path"].count("/") + 1
-    tmp_name = event["name"] + f"Path {path_depth}"
+    # Create a temporary name that includes the path
+    tmp_name = event["name"] + event["path"]
 
     # Determine the increment of the function
     if tmp_name in known_increments:
