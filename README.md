@@ -85,13 +85,18 @@ nvm use 20
 pip install -r ${WORKVIZ_DIR}/app/workvisualizer/requirements.txt
 ```
 
-5. In one terminal instance, run
+5. From the `${WORKVIZ_DIR}/app/workvisualizer` directory, run:
+```sh
+npm install
+```
+
+6. In one terminal instance, run
 ```sh
 cd ${WORKVIZ_DIR}/app/workvisualizer/api
 uvicorn main:app --reload
 ```
 
-6. In a separate terminal, run
+7. In a separate terminal, run
 
 ```sh
 cd ${WORKVIZ_DIR}/app/workvisualizer
