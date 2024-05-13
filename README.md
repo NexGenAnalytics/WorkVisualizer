@@ -80,7 +80,49 @@ nvm install 20
 nvm use 20
 ```
 
-_TODO: Finish_
+4. Install necessary Python packages
+```sh
+pip install -r ${WORKVIZ_DIR}/app/workvisualizer/requirements.txt
+```
+
+5. In one terminal instance, run
+```sh
+cd ${WORKVIZ_DIR}/app/workvisualizer/api
+uvicorn main:app --reload
+```
+
+6. In a separate terminal, run
+
+```sh
+cd ${WORKVIZ_DIR}/app/workvisualizer
+npm run dev
+```
+
+You will see something like:
+
+```
+> workvisualizer@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.3
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 1983ms
+ ○ Compiling / ...
+ ✓ Compiled / in 7.7s (3639 modules)
+ GET / 200 in 8100ms
+ ✓ Compiled in 374ms (1686 modules)
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /dashboard in 2.5s (1974 modules)
+ ✓ Compiled in 1835ms (2242 modules)
+ GET /dashboard 200 in 2957ms
+ GET /favicon.ico 200 in 6ms
+
+```
+
+The WorkVisualizer will be available at the provided local address (in this case, `http://localhost:3000`).
+
 
 ## Scripts
 
