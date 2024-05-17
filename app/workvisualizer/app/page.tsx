@@ -1,18 +1,36 @@
 import React from "react";
-import {Button} from "@nextui-org/react";
+import {Button, Input, Textarea} from "@nextui-org/react";
 import Link from 'next/link'
+import DarkModeToggle from '@/app/ui/components/utility/DarkModeToggle'
 
-export default function Page() {
+const Page = () => {
+    // const { setTheme, type } = useTheme();
+    //
+    // const handleThemeToggle = () => {
+    //     setTheme(type === 'dark' ? 'light' : 'dark');
+    // };
+
     return (
-        <main className="flex min-h-screen flex-col p-6 bg-gradient-to-r from-indigo-800 to-indigo-900">
-            <div className="backdrop-blur-sm bg-white/30 p-5 rounded-lg bg-slate-500 min-w-20">
-                <h1>Work Visualizer</h1>
-            </div>
-            <div>
-                <Link href="/dashboard">
-                    <Button>Go to Dashboard</Button>
-                </Link>
-            </div>
-        </main>
+        <div className="flex flex-col min-h-screen bg-gray-800 text-white">
+            {/* Header Section */}
+            <header className="flex justify-between items-center p-4 bg-gray-900">
+                <h1 color="warning">WorkVisualizer</h1>
+                <DarkModeToggle></DarkModeToggle>
+            </header>
+
+            {/* Main Content Section */}
+            <main className="flex flex-1 items-center justify-center">
+                <Button color="primary">
+                    Upload...
+                </Button>
+            </main>
+
+            {/* Footer Section */}
+            <footer className="w-full text-center text-sm p-4 bg-gray-900">
+                © 2024 NexGen Analytics WorkVisualizer. All rights reserved.
+            </footer>
+        </div>
     );
-}
+};
+
+export default Page;
