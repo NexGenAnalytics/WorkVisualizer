@@ -13,7 +13,6 @@ export default async function Page() {
 };
 
 async function getData() {
-    const res = await fetch('http://127.0.0.1:8000/api/global_hierarchy')
     try {
         const res = await fetch('http://127.0.0.1:8000/api/spacetime')
 
