@@ -1,6 +1,3 @@
-"""Plots the MPI and Kokkos data over time."""
-
-
 import os
 import json
 import pandas as pd
@@ -16,19 +13,8 @@ from matplotlib import colormaps
 
 
 """
-Takes in a trace json and outputs the frequency of a given call.
-
-Steps to recreate:
-  - export KOKKOS_TOOLS_LIBS=/path/to/libcaliper.so
-  - export CALI_CONFIG_FILE=/path/to/caliper.config
-  - <run program>
-        - MiniEM:    mpirun -n 4 ./PanzerMiniEM_BlockPrec.exe --numTimeSteps=10
-        - ExaMiniMD: mpirun -np 4 -bind-to socket ./ExaMiniMD -il ../input/in.lj --comm-type MPI --kokkos-map-device-id-by=mpi_rank
-        - ExaMPM:    mpirun -n 4 ./DamBreak 0.05 2 0 0.1 1.0 10 serial
-  - touch em_4p_100s_alltrace.json
-        - Format: <app>_<num_procs>p_<num_steps>s_<all/mpi>trace.json)
-  - cali-query -q "SELECT * FORMAT json" *.cali | tee em_4p_100s_alltrace.json
-  - <move resulting json to this directory>
+Takes in the hierarchical JSON (from generate_hierarchy_data.py) and flattens it into a list of events.
+The resulting JSON can be used to create the spacetime plots.
 """
 
 
@@ -96,7 +82,6 @@ draw_macroloops = args.draw_macroloops
 output_proc = int(args.proc)
 plot_all_functions = args.all
 plot_filtered_functions = args.filtered
-sorting_key = args.sorting_key.lower() if args.sorting_key is not None else None
 target_proc = int(args.target)
 metaslice = args.metaslice
 vertical_plot = args.vertical
@@ -117,21 +102,6 @@ else:
 rank = int(file_splits[1].split("r")[0]) if "r_" in json_file else 0
 n_steps = int(file_splits[2].split("s")[0])
 
-# Determine sorting key
-if sorting_key is None:
-    yaxis_label = "Default Ordering (read-in sequence)"
-elif sorting_key == "path":
-    yaxis_label = "-----> Increasing Depth in the Path ----->"
-elif sorting_key == "rank":
-    yaxis_label = f"Functions ordered by Rank (0 --> {n_procs})"
-elif sorting_key == "duration":
-    yaxis_label = "-----> Increasing Time Spent in Each Function ----->"
-elif sorting_key == "call":
-    yaxis_label ="Functions ordered by call type (MPI Collective -> MPI -> Kokkos)"
-else:
-    print(f" Sorting key {sorting_key} not recongized; using the default ordering instead. Supported keys: 'path', 'call', 'rank'.")
-    sorting_key = None
-    yaxis_label = "Default Ordering (read-in sequence)"
 
 # Create save directory
 current_dir = os.getcwd()
@@ -163,12 +133,8 @@ increment = 1.0 / len(flattened_events)
 known_increments = {}
 
 # Sort the JSON by path
-# print(flattened_events[:10])
 sorted_events = sorted(flattened_events, reverse=True, key=sort_functions)
-for event in sorted_events:
-    print(event["path"].count("/"))
-# print()
-# print(sorted_events[:10])
+
 # Then create a json with the relevant info
 iter = 1
 for event in sorted_events:

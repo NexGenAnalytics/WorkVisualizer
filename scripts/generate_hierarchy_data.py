@@ -2,6 +2,16 @@ import os
 import json
 import argparse
 
+"""
+Takes in the raw Caliper output and creates a JSON with nested hierarchies.
+Matches event.begin functions with event.end to determine duration and end time.
+Also determines MPI_Send/Recv destinations/sources.
+
+The resulting JSON can be used to create any of D3's hierarchical visualizations, such as
+  - Tree
+  - Sunburst
+"""
+
 class DataPruner:
 
     def __init__(self, input_data: dict, rank: int, time_range: tuple = None):
@@ -126,8 +136,8 @@ class DataPruner:
                         break
 
             # General filtering
-            if "Kokkos Profile Tool Fence" in function_name or path.count("/") > 5:
-                continue
+            # if "Kokkos Profile Tool Fence" in function_name or path.count("/") > 5:
+            #     continue
 
             # Keep track of how many begins and ends there are
             if begin:
@@ -181,48 +191,41 @@ class DataPruner:
                 self.current_depth += 1
 
             else:
-                # Loop through all unpaired begins
+                # Only search in "current level" children dict
                 root_list = self.pruned_json
-                for depth in range(self.current_depth):
-                    if depth == 0:
-                        root_list = root_list
-                    else:
-                        most_recent_begin_dict = root_list[-1]
-                        root_list = most_recent_begin_dict["children"]
+                for _ in range(self.current_depth):
+                    most_recent_begin_dict = root_list[-1]
+                    root_list = most_recent_begin_dict["children"]
 
-                    for beginning in root_list:
+                for beginning in root_list:
 
-                        # Generate the "path" variable to compare against
-                        comp_path = beginning["path"] + "/" + function_name if beginning["path"] != "" else function_name
+                    # Generate the "path" variable to compare against
+                    comp_path = beginning["path"] + "/" + function_name if beginning["path"] != "" else function_name
 
-                        # Try to find a match for all relevant info
-                        if "end_time" not in beginning and \
-                          beginning["name"] == function_name and \
-                          beginning["kernel_type"] == kernel_type and \
-                          comp_path == path:
-                              beginning["end_time"] = event_time
+                    # Try to find a match for all relevant info
+                    if "end_time" not in beginning and \
+                        beginning["name"] == function_name and \
+                        beginning["kernel_type"] == kernel_type and \
+                        comp_path == path:
+                            beginning["end_time"] = event_time
 
-                              # Since we're closing the event, if it doesn't have children now it never will
-                              if beginning["children"] == []:
+                            # Since we're closing the event, if it doesn't have children now it never will
+                            if beginning["children"] == []:
                                 del beginning["children"]
                                 beginning["duration"] = event_time - beginning["begin_time"]
 
-                              paired = True
-                              break
+                            paired = True
+                            break
 
                 if paired:
                     print(f"    FOUND A MATCH FOR {function_name}")
-                    self.current_depth -= 1
 
                 # Otherwise, add event info to unpaired ends (CURRENTLY, THIS SHOULD NEVER HAPPEN)
                 else:
-                    event_footprint = {
-                        "name": function_name,
-                        "end_time": event_time,
-                        "kernel_type": kernel_type,
-                        "path": path
-                    }
                     self.unpaired_ends.append(event_footprint)
+
+                # Just keep moving if we don't find a match...because we should have
+                self.current_depth -= 1
 
             print()
             iter += 1
@@ -290,7 +293,7 @@ def main():
     pruner = DataPruner(json_data, rank, time_range=time_range)
     pruned_json = pruner.parse_json()
 
-    output_path = f"{output_dir}/{app_abr}_{rank}r_{n_steps}s_pruned.json"
+    output_path = f"{output_dir}/{app_abr}_{rank}r_{n_steps}s_NEW_pruned.json"
 
     with open(output_path, "w") as out_json:
         json.dump(pruned_json, out_json)
