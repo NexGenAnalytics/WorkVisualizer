@@ -25,10 +25,9 @@ const SpaceTime = ({ data }) => {
         // Define brush for zooming
         var brush = d3.brush()
             .extent([ [0,0], [width, height] ])
+            .on("start", disableTooltips)
             .on("end", updateChart);
 
-        // console.log(data)
-        // console.log(d3.extent(data, (d) => d.begin_time));
 
         // Prepare the scales for positional encoding.
         const x = d3.scaleLinear()
@@ -77,18 +76,22 @@ const SpaceTime = ({ data }) => {
             .call(d3.axisBottom(x).ticks(width / 80))
             .call(g => g.select(".domain"))
             .call(g => g.append("text")
-                .attr("x", width)
+                .attr("x", width / 2)
                 .attr("y", marginBottom - 4)
                 .attr("fill", "currentColor")
-                .attr("text-anchor", "end")
-                .text("Function Begin Time (s) →"));
+                .attr("text-anchor", "center")
+                .text("Function Begin Time (s)"));
 
         var yAxis = svg.append("g")
             .call(d3.axisLeft(y).tickValues([]))
             .call(g => g.select(".domain").remove())
             .call(g => g.append("text")
-                .attr("x", marginLeft)
-                .attr("y", height));
+                .attr("x", -height / 2 + 50)
+                .attr("y", marginLeft - 10)
+                .attr("fill", "currentColor")
+                .attr("text-anchor", "center")
+                .attr("transform", "rotate(-90)")
+                .text("<-- Depth in the Path <--"));
 
         // Create the grid.
         // svg.append("g")
@@ -112,20 +115,20 @@ const SpaceTime = ({ data }) => {
         //       .attr("x2", width - marginRight));
 
         // Add brushing
-        svg.append("g")
+        var brushGroup = svg.append("g")
             .attr("class", "brush")
             .call(brush);
 
         // Define a clip to hide any data points outside of the brushed window
-        svg.append("defs").append("svg:clipPath")
-            .attr("id", "clip")
-            .append("svg:rect")
-            .attr("id", "clip-rect")
-            .attr("x", marginLeft)
-            .attr("y", marginBottom - 4)
-            .attr('width', width - marginLeft - marginRight)
-            .attr('height', height - marginBottom - marginTop);
-        svg.append("g").attr("clip-path", "url(#clip)")
+        // svg.append("defs").append("svg:clipPath")
+        //     .attr("id", "clip")
+        //     .append("svg:rect")
+        //     .attr("id", "clip-rect")
+        //     .attr("x", marginLeft)
+        //     .attr("y", marginBottom - 4)
+        //     .attr('width', width - marginLeft - marginRight)
+        //     .attr('height', height - marginBottom - marginTop);
+        // svg.append("g").attr("clip-path", "url(#clip)")
 
         // A selection for the tooltip
         // const tooltip = d3.select(container).select(".tooltip");
@@ -141,28 +144,28 @@ const SpaceTime = ({ data }) => {
 
         // Define a function for what happens when mousing over a data point
         var mouseenter = function(event, d) {
-            const [mx, my] = d3.pointer(event);
+
             // Enlarge the selected data point and outline in white
             d3.select(this).transition()
-                .duration('50')
-                .attr("r", 6)
-                .attr("stroke", "white");
+            .duration('50')
+            .attr("r", 6)
+            .attr("stroke", "white");
 
-                // Define the text in the tooltip
+            // Define the text in the tooltip
             var tooltip_text = `${d.name}\n
-                                Start: ${formatTime(d.begin_time)} s\n
-                                End: ${formatTime(d.end_time)} s\n
-                                Duration: ${formatTime(d.duration)} s`;
+            Start: ${formatTime(d.begin_time)} s\n
+            End: ${formatTime(d.end_time)} s\n
+            Duration: ${formatTime(d.duration)} s`;
             if ("src" in d) {
-            tooltip_text += `\nSource: ${d.src}`;
+                tooltip_text += `\nSource: ${d.src}`;
             }
             if ("dst" in d) {
-            tooltip_text += `\nDestination: ${d.dst}`;
+                tooltip_text += `\nDestination: ${d.dst}`;
             }
             if (d.path.length > 0) {
-            tooltip_text += `\nPath: ${d.path}`;
+                tooltip_text += `\nPath: ${d.path}`;
             }
-
+            const [mx, my] = d3.pointer(event);
             tooltip
                 .attr("transform", `translate(${mx}, ${my})`)
                 .selectAll("tspan")
@@ -171,29 +174,6 @@ const SpaceTime = ({ data }) => {
                 .attr("dy", "2em")
                 .attr("x", "0px")
                 .text((text) => text );
-
-            // Define the text in the tooltip
-            // var tooltip_text = `<b>${d.name}</b><br>
-            //                     Start: ${formatTime(d.begin_time)} s<br>
-            //                     End: ${formatTime(d.end_time)} s<br>
-            //                     Duration: ${formatTime(d.duration)} s`;
-            // if ("src" in d) {
-            // tooltip_text += `<br>Source: ${d.src}`;
-            // }
-            // if ("dst" in d) {
-            // tooltip_text += `<br>Destination: ${d.dst}`;
-            // }
-            // if (d.path.length > 0) {
-            // tooltip_text += `<br>Path: ${d.path}`;
-            // }
-
-            // // Make the tooltip visible and position correctly
-            // const [mx, my] = d3.pointer(event);
-            // tooltip
-            // .style("opacity", 1)
-            // .style("top", (my - 50) + "px")
-            // .style("left", (mx + 90) + "px")
-            // .html(tooltip_text);
         }
 
         // Define a function for when the mouse leaves a data point
@@ -227,30 +207,117 @@ const SpaceTime = ({ data }) => {
         var idleTimeout
         function idled() { idleTimeout = null; }
 
+        // Stack to keep track of zoom states
+        var zoomStack = [];
+
         // A function that update the chart for given boundaries
         function updateChart({selection}) {
 
+            disableTooltips;
+
             // If no selection, back to initial coordinate. Otherwise, update X and Y domains
             if (!selection) {
-            if (!idleTimeout) return idleTimeout = setTimeout(idled, 350);
-            x.domain(d3.extent(data, d => d.begin_time));
-            y.domain(d3.extent(data, d => d.y_value));
+                if (!idleTimeout) return idleTimeout = setTimeout(idled, 350);
+                x.domain(d3.extent(data, d => d.begin_time));
+                y.domain(d3.extent(data, d => d.y_value));
             } else {
-            // Update x and y domains based on brush selection
-            x.domain([x.invert(selection[0][0]), x.invert(selection[1][0])]);
-            y.domain([y.invert(selection[1][1]), y.invert(selection[0][1])]);
-            // Clear the brush
-            svg.select(".brush").call(brush.move, null)
+
+                const zoomState = {
+                    xDomain: x.domain(),
+                    yDomain: y.domain()
+                };
+                zoomStack.push(zoomState);
+
+                // Update x and y domains based on brush selection
+                x.domain([x.invert(selection[0][0]), x.invert(selection[1][0])]);
+                y.domain([y.invert(selection[1][1]), y.invert(selection[0][1])]);
+
+                // Clear the brush
+                svg.select(".brush").call(brush.move, null)
             }
 
             // Update axis and circle position
             xAxis.transition().duration(750).call(d3.axisBottom(x).ticks(width / 80));
             yAxis.transition().duration(750).call(d3.axisLeft(y)).call(g => g.select(".domain").remove());
             svg.selectAll("circle")
-            .transition().duration(750)
-            .attr("cx", d => x(d.begin_time))
-            .attr("cy", d => y(d.y_value));
+                .transition().duration(750)
+                .attr("cx", d => x(d.begin_time))
+                .attr("cy", d => y(d.y_value))
+                .on("end", function() {
+                    // Re-enable mouse events after transition ends
+                    d3.select(this).style("pointer-events", "all");
+                });
         }
+
+        svg.on("dblclick", () => {
+            disableTooltips;
+            if (zoomStack.length > 0) {
+                const lastZoomState = zoomStack.pop();
+                x.domain(lastZoomState.xDomain);
+                y.domain(lastZoomState.yDomain);
+
+                xAxis.transition().duration(750).call(d3.axisBottom(x).ticks(width / 80));
+                yAxis.transition().duration(750).call(d3.axisLeft(y)).call(g => g.select(".domain").remove());
+                svg.selectAll("circle")
+                    .transition().duration(750)
+                    .attr("cx", d => x(d.begin_time))
+                    .attr("cy", d => y(d.y_value))
+                    .on("end", function() {
+                        d3.select(this).style("pointer-events", "all");
+                    });
+            }
+            enableTooltips;
+        });
+
+        // Simple function to disable tooltips during transitions
+        function disableTooltips() {
+            svg.selectAll("circle").style("pointer-events", "none");
+        }
+
+        // Simple function to enable tooltips during transitions
+        function enableTooltips() {
+            svg.selectAll("circle").style("pointer-events", "all");
+        }
+
+        //////////////////////////////////////////////////////////
+        //////                    LEGEND                    //////
+        //////////////////////////////////////////////////////////
+
+        // Create a legend
+        const legend = svg.append("g")
+            .attr("class", "legend")
+            .attr("transform", `translate(${marginLeft}, 20)`); // Adjust the position of the legend
+
+        // Add legend items
+        const legendItems = legend.selectAll(".legend-item")
+            .data(colorScale.domain())
+            .enter().append("g")
+            .attr("class", "legend-item")
+            .attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+        // Add colored rectangles
+        legendItems.append("rect")
+            .attr("x", 0)
+            .attr("width", 10)
+            .attr("height", 10)
+            .attr("fill", colorScale);
+
+        // Add text labels
+        legendItems.append("text")
+            .attr("x", 15)
+            .attr("y", 5)
+            .attr("dy", "0.75em")
+            .text(d => d);
+
+        // Add a background rectangle for the legend
+        legend.insert("rect", ":first-child")
+            .attr("x", -5)
+            .attr("y", -5)
+            .attr("width", 110)
+            .attr("height", colorScale.domain().length * 20 + 10)
+            .attr("fill", "white")
+            .attr("opacity", 0.7)
+            .attr("stroke", "none");
     }, [data]);
 
     return (
