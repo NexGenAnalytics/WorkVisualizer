@@ -27,4 +27,10 @@ const Page = () => {
     );
 };
 
+export const metadata = {
+    icons: {
+        icon: '/favicon.png',
+    },
+}
+
 export default Page;

@@ -29,7 +29,7 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
                         'Content-Type': 'multipart/form-data',
                     },
                 });
-                console.log('File uploaded successfully', response.data);
+                console.log('File uploaded successfully');
                 if (redirectOnSuccess) {
                     router.push(redirectOnSuccess);
                 }

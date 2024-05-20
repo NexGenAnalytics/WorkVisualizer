@@ -1,6 +1,6 @@
 'use client'
 import React from "react";
-import {Navbar, NavbarBrand, NavbarContent, NavbarItem, NavbarMenuToggle, NavbarMenu, NavbarMenuItem, Link, Button} from "@nextui-org/react";
+import {Navbar, NavbarBrand, NavbarContent, NavbarItem, NavbarMenuToggle, NavbarMenu, NavbarMenuItem, Link, Button, Spacer} from "@nextui-org/react";
 import Logo from './styling/Logo'
 import DarkModeToggle from '@/app/ui/components/utility/DarkModeToggle'
 
@@ -28,6 +28,7 @@ export default function NavBar() {
                 />
                 <NavbarBrand>
                     <Logo />
+                    <Spacer x={4} />
                     <p className="font-bold text-3xl">WorkVisualizer</p>
                 </NavbarBrand>
             </NavbarContent>

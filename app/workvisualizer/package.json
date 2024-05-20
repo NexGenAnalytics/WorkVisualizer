@@ -20,7 +20,9 @@
     "next": "14.2.3",
     "next-themes": "^0.3.0",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "react-grid-layout": "^1.4.4",
+    "react-icons": "^5.2.1"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",

@@ -1,16 +1,23 @@
+import React from 'react';
+import { Responsive, WidthProvider } from 'react-grid-layout';
+import NavBar from "@/app/ui/components/NavBar";
 import GlobalIndentedTree from '@/app/ui/components/GlobalIndentedTree';
 import SpaceTime from '@/app/ui/components/SpaceTime';
-import { redirect } from 'next/navigation';
+import UploadJsonButton from "@/app/ui/components/utility/UploadJsonButton";
+import { IoIosStats } from 'react-icons/io';
+import {redirect} from "next/navigation";
+
+// const ResponsiveGridLayout = WidthProvider(Responsive);
 
 export default async function Page() {
     const data = await getData()
     return (
         <div>
-            <h1>Dashboard</h1>
+            <NavBar />
             <SpaceTime data={data} />
         </div>
     );
-};
+}
 
 async function getData() {
     try {
@@ -20,7 +27,6 @@ async function getData() {
             throw new Error('Failed to fetch data')
         }
         const jsonData = await res.json();
-        console.log(jsonData)
 
         if (jsonData.message === "No file was uploaded.") {
             console.log(jsonData.message);
