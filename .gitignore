@@ -5,3 +5,5 @@ data/pruned/md*
 data/raw/md*
 plots
 app/workvisualizer/api/files/*
+
+!data/raw/md_0r_100s_alltrace.json
