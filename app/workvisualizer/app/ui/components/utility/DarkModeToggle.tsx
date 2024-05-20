@@ -1,10 +1,7 @@
-'use client';
-
 import {useTheme} from "next-themes";
 import {Switch} from '@nextui-org/react'
-import { useEffect, useState } from "react";
 
-// export function ThemeSwitcher() {
+// const DarkModeToggle = () => {
 //     const [mounted, setMounted] = useState(false)
 //     const { theme, setTheme } = useTheme()
 //
@@ -24,15 +21,23 @@ import { useEffect, useState } from "react";
 // };
 
 const DarkModeToggle = () => {
-    const { setTheme } = useTheme();
+    const { theme, setTheme } = useTheme()
+    console.log("DarkModeToggle:", theme)
+
+    const handleThemeChange = (checked: any) => {
+        console.log("DarkModeToggle checked:", checked)
+        setTheme(checked ? 'dark' : 'light');
+    }
 
     return (
-        <Switch
-            checked={false}
-            onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')}
-            color="primary"
-        />
-    );
+        <div>
+            {/*The current theme is: {theme}*/}
+            <Switch
+                defaultChecked={theme === 'dark'}
+                onChange={handleThemeChange}
+            />
+        </div>
+    )
 };
 
 export default DarkModeToggle;
