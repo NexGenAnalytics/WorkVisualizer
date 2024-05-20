@@ -326,22 +326,3 @@ const SpaceTime = ({ data }) => {
 };
 
 export default SpaceTime;
-
-
-
-    // function _data(FileAttachment){return(
-    // FileAttachment("md_0r_100s_pruned_scatter@2.json").json()
-    // )}
-
-    // export default function define(runtime, observer) {
-    //   const main = runtime.module();
-    //   function toString() { return this.url; }
-    //   const fileAttachments = new Map([
-    //     ["md_0r_100s_pruned_scatter@2.json", {url: new URL("./files/42249c67dd3cc7eff4336c629104489fee871777ef74a311e7895db60cf99e82ee828ca565c93e37e076d64a65b9f33af102a4d7286e9e79c58f216e33c2644d.json", import.meta.url), mimeType: "application/json", toString}]
-    //   ]);
-    //   main.builtin("FileAttachment", runtime.fileAttachments(name => fileAttachments.get(name)));
-    //   main.variable(observer()).define(["md"], _1);
-    //   main.variable(observer("chart")).define("chart", ["d3","data","html"], _chart);
-    //   main.variable(observer("data")).define("data", ["FileAttachment"], _data);
-    //   return main;
-    // }

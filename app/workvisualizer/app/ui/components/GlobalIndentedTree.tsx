@@ -15,28 +15,28 @@ const GlobalSunBurst = ({ data }) => {
         const nodes = root.descendants();
         const width = 928;
         const height = (nodes.length + 1) * nodeSize;
-        
+
         const columns = [
             {
-            label: "Total Time Spent in Kernel (s)", 
-            value: d => d.duration, 
-            format, 
+            label: "Total Time Spent in Kernel (s)",
+            value: d => d.duration,
+            format,
             x: 580
             },
             {
-            label: "# of Instances", 
-            value: d => d.count, 
-            format: (value, d) => d.count ? format(value) : "-", 
+            label: "# of Instances",
+            value: d => d.count,
+            format: (value, d) => d.count ? format(value) : "-",
             x: 700
             }
         ];
-        
+
         svg
             .attr("width", width)
             .attr("height", height)
             .attr("viewBox", [-nodeSize / 2, -nodeSize * 3 / 2, width, height])
             .attr("style", "max-width: 100%; height: auto; font: 10px sans-serif; overflow: visible;");
-        
+
         svg.append("style")
             .text(`
             .highlighted text {
@@ -44,7 +44,7 @@ const GlobalSunBurst = ({ data }) => {
                 font-weight: bold; /* Make the text bold */
             }
             `);
-        
+
         const link = svg.append("g")
             .attr("fill", "none")
             .attr("stroke", "#999")
@@ -56,27 +56,27 @@ const GlobalSunBurst = ({ data }) => {
                 V${d.target.index * nodeSize}
                 h${nodeSize}
             `);
-        
+
         const node = svg.append("g")
             .selectAll()
             .data(nodes)
             .join("g")
             .attr("transform", d => `translate(0,${d.index * nodeSize})`);
-        
+
         node.append("circle")
             .attr("cx", d => d.depth * nodeSize)
             .attr("r", 2.5)
             .attr("fill", d => d.children ? "white" : "#999");
-        
+
         node.append("text")
             .attr("dy", "0.32em")
             .attr("fill", d => d.children ? "white" : "#999")
             .attr("x", d => d.depth * nodeSize + 6)
             .text(d => d.data.name);
-        
+
         node.append("title")
             .text(d => d.ancestors().reverse().map(d => d.data.name).join("/"));
-        
+
         for (const {label, value, format, x} of columns) {
             svg.append("text")
                 .attr("dy", "0.32em")
@@ -86,7 +86,7 @@ const GlobalSunBurst = ({ data }) => {
                 .attr("font-weight", "bold")
                 .attr("fill", "white")
                 .text(label);
-        
+
             node.append("text")
                 .attr("dy", "0.32em")
                 .attr("x", x)
@@ -95,9 +95,9 @@ const GlobalSunBurst = ({ data }) => {
             .data(root.copy().sum(value).descendants())
                 .text(d => format(d.value, d));
         }
-        
+
         node.on("click", clicked);
-        
+
         function clicked(event, d) {
 
             const isHighlighted = d3.select(this).classed("highlighted");
@@ -105,7 +105,7 @@ const GlobalSunBurst = ({ data }) => {
             // Remove highlight from previously highlighted nodes
             // svg.selectAll(".highlighted")
             // .classed("highlighted", false);
-        
+
             if (!isHighlighted) {
                 d3.select(this)
                   .classed("highlighted", true)
@@ -114,9 +114,9 @@ const GlobalSunBurst = ({ data }) => {
                 d3.select(this)
                   .classed("highlighted", false);
             }
-        
+
         }
-        
+
     }, [data]);
 
     return (

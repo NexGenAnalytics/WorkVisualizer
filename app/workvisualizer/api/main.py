@@ -16,21 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# Used by SpaceTime
-@app.get("/api/spacetime")
-def get_spacetime_data():
-    print("Getting Data")
-    filename = "../../../data/d3_scatter/md_0r_100s_pruned_scatter.json"
-    try:
-        with open(filename) as f:
-            spacetime_data = json.load(f)
-        print(" Found data")
-        return spacetime_data
-    except FileNotFoundError:
-        print(" Didn't find data")
-        return {"message": "No file was uploaded."}
-
+files_dir = os.path.join(os.getcwd(), "files")
 
 @app.post("/api/upload")
 async def upload_json_trace(file: UploadFile):
@@ -40,7 +26,7 @@ async def upload_json_trace(file: UploadFile):
             raise error
         contents = file.file.read()
         subprocess.run(['mkdir', '-p', 'files'])
-        with open('files/current.json', 'wb') as f:
+        with open('files/raw_data.json', 'wb') as f:
             f.write(contents)
     except Exception as e:
         return {"message": f"There was an error uploading the file: {e}"}
@@ -50,10 +36,56 @@ async def upload_json_trace(file: UploadFile):
     return {"message": f"Successfully uploaded {file.filename}."}
 
 
-# Used by the GlobalSunBurst and GlobalIndentedTree
+@app.get("/api/hierarchy")
+def get_hierarchy_data():
+    filename = "hierarchy.json"
+    filepath = os.path.join(files_dir, filename)
+
+    if os.path.isfile(filepath):
+        with open(filepath) as f:
+            return json.load(f)
+
+    else:
+        subprocess.run(["python", "../../../scripts/generate_full_hierarchy_data.py",
+                        "-i", os.path.join(files_dir, "raw_data.json"),
+                        "-od", os.path.join(files_dir),
+                        "-of", filename])
+        return get_hierarchy_data()
+
 @app.get("/api/global_hierarchy")
 def get_global_hierarchy_data():
-    filename = "../../../data/d3_hierarchy/md_0r_100s_global_hierarchy.json"
-    with open(filename) as f:
-        global_hierarchy_data = json.load(f)
-    return global_hierarchy_data
+    filename = "global_hierarchy.json"
+    filepath = os.path.join(files_dir, filename)
+
+    if os.path.isfile(filepath):
+        with open(filepath) as f:
+            return json.load(f)
+
+    else:
+        if not os.path.isfile(os.path.join(files_dir, "hierarchy.json")):
+            get_hierarchy_data()
+
+        subprocess.run(["python", "../../../scripts/generate_global_hierarchy_data.py",
+                        "-i", os.path.join(files_dir, "hierarchy.json"),
+                        "-od", os.path.join(files_dir),
+                        "-of", filename])
+        return get_global_hierarchy_data()
+
+@app.get("/api/spacetime")
+def get_spacetime_data():
+    filename = "spacetime.json"
+    filepath = os.path.join(files_dir, filename)
+
+    if os.path.isfile(filepath):
+        with open(filepath) as f:
+            return json.load(f)
+
+    else:
+        if not os.path.isfile(os.path.join(files_dir, "hierarchy.json")):
+            get_hierarchy_data()
+
+        subprocess.run(["python", "../../../scripts/generate_spacetime_data.py",
+                        "-i", os.path.join(files_dir, "hierarchy.json"),
+                        "-od", os.path.join(files_dir),
+                        "-of", filename])
+        return get_spacetime_data()

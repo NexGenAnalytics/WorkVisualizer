@@ -7,24 +7,22 @@ Takes in the raw Caliper output and creates a JSON with nested hierarchies.
 Matches event.begin functions with event.end to determine duration and end time.
 Also determines MPI_Send/Recv destinations/sources.
 
-The resulting JSON can be used to create any of D3's hierarchical visualizations, such as
+The resulting JSON can be used to create many of D3's hierarchical visualizations, such as
   - Tree
   - Sunburst
 """
 
 class DataPruner:
 
-    def __init__(self, input_data: dict, rank: int, time_range: tuple = None):
+    def __init__(self, input_data: dict, time_range: tuple = None):
         # Initialize the necessary lists
         self.pruned_json = []
         self.unpaired_ends = []
 
-        # Save rank for sanity checks
-        self.rank = rank
-
         # Initialize the depth of the call graph
         self.current_depth = 0
         self.max_depth = 0
+        # self.rank = rank
 
         # Initialize json data
         self.json_data = input_data
@@ -59,11 +57,11 @@ class DataPruner:
             if self.current_depth > self.max_depth:
                 self.max_depth = self.current_depth
 
-            if event["mpi.rank"] != self.rank:
-                continue
+            # if event["mpi.rank"] != 0:
+            #     continue
 
-            # Perform a sanity check
-            assert self.rank == event["mpi.rank"]
+            # # Perform a sanity check
+            # assert self.rank == event["mpi.rank"]
 
             # Get the name of the MPI or Kokkos function
             # Also identify if it is beginning or ending the event
@@ -191,41 +189,48 @@ class DataPruner:
                 self.current_depth += 1
 
             else:
-                # Only search in "current level" children dict
+                # Loop through all unpaired begins
                 root_list = self.pruned_json
-                for _ in range(self.current_depth):
-                    most_recent_begin_dict = root_list[-1]
-                    root_list = most_recent_begin_dict["children"]
+                for depth in range(self.current_depth):
+                    if depth == 0:
+                        root_list = root_list
+                    else:
+                        most_recent_begin_dict = root_list[-1]
+                        root_list = most_recent_begin_dict["children"]
 
-                for beginning in root_list:
+                    for beginning in root_list:
 
-                    # Generate the "path" variable to compare against
-                    comp_path = beginning["path"] + "/" + function_name if beginning["path"] != "" else function_name
+                        # Generate the "path" variable to compare against
+                        comp_path = beginning["path"] + "/" + function_name if beginning["path"] != "" else function_name
 
-                    # Try to find a match for all relevant info
-                    if "end_time" not in beginning and \
-                        beginning["name"] == function_name and \
-                        beginning["kernel_type"] == kernel_type and \
-                        comp_path == path:
-                            beginning["end_time"] = event_time
+                        # Try to find a match for all relevant info
+                        if "end_time" not in beginning and \
+                          beginning["name"] == function_name and \
+                          beginning["kernel_type"] == kernel_type and \
+                          comp_path == path:
+                              beginning["end_time"] = event_time
 
-                            # Since we're closing the event, if it doesn't have children now it never will
-                            if beginning["children"] == []:
+                              # Since we're closing the event, if it doesn't have children now it never will
+                              if beginning["children"] == []:
                                 del beginning["children"]
                                 beginning["duration"] = event_time - beginning["begin_time"]
 
-                            paired = True
-                            break
+                              paired = True
+                              break
 
                 if paired:
                     print(f"    FOUND A MATCH FOR {function_name}")
+                    self.current_depth -= 1
 
                 # Otherwise, add event info to unpaired ends (CURRENTLY, THIS SHOULD NEVER HAPPEN)
                 else:
+                    event_footprint = {
+                        "name": function_name,
+                        "end_time": event_time,
+                        "kernel_type": kernel_type,
+                        "path": path
+                    }
                     self.unpaired_ends.append(event_footprint)
-
-                # Just keep moving if we don't find a match...because we should have
-                self.current_depth -= 1
 
             print()
             iter += 1
@@ -248,9 +253,11 @@ def main():
 
     # Parse arguments
     parser = argparse.ArgumentParser(description="Takes in the path to an executable and returns a visualization of the Kokkos kernels.")
-    parser.add_argument("-i", "--input", help="Input JSON file containing MPI traces for all ranks.")
+    parser.add_argument("-i", "--input", help="Input JSON file containing MPI traces for all rank (path from current directory).")
     parser.add_argument("-start", "--start_time", default=None, help="Beginning of time range of desired calls (i.e. beginning of a loop)")
     parser.add_argument("-end", "--end_time", default=None, help="End of time range of desired calls (i.e. end of a loop)")
+    parser.add_argument("-od", "--output_dir", default="", help="Path to the output file")
+    parser.add_argument("-of", "--output_filename", default="", help="Name of the output file")
     args = parser.parse_args()
     json_file = args.input
     start = float(args.start_time) if args.start_time is not None else None
@@ -263,26 +270,33 @@ def main():
     if (start is not None or end is not None) and (end is None or start is None):
         print("Warning: Must provide both start and end times to specify the time range.")
 
-    # Get problem info
-    file_splits = json_file.split("_")
-    app_abr = file_splits[0].lower()
-    if "/" in app_abr:
-        app_abr = app_abr.split("/")[-1]
-    if app_abr == "mpm" or app_abr == "exampm":
-        app = "ExaMPM"
-    elif app_abr == "md" or app_abr == "examinimd":
-        app = "ExaMiniMD"
-    elif app_abr == "em" or app_abr == "miniem":
-        app = "MiniEM"
-    else:
-        app = app_abr
-    rank = int(file_splits[1].split("r")[0]) if "r_" in json_file else 0
-    n_steps = int(file_splits[2].split("s")[0])
-
     # Create save directory
     current_dir = os.getcwd()
-    output_dir = os.path.join(current_dir, "data", "pruned")
+    if args.output_dir == "":
+        output_dir = os.path.join(current_dir, "data", "pruned")
+    else:
+        output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
+
+    # Get problem info
+    if args.output_filename == "":
+        file_splits = json_file.split("_")
+        app_abr = file_splits[0].lower()
+        if "/" in app_abr:
+            app_abr = app_abr.split("/")[-1]
+        if app_abr == "mpm" or app_abr == "exampm":
+            app = "ExaMPM"
+        elif app_abr == "md" or app_abr == "examinimd":
+            app = "ExaMiniMD"
+        elif app_abr == "em" or app_abr == "miniem":
+            app = "MiniEM"
+        else:
+            app = app_abr
+        rank = int(file_splits[1].split("r")[0]) if "r_" in json_file else 0
+        n_steps = int(file_splits[2].split("s")[0])
+        output_path = f"{output_dir}/{app_abr}_{rank}r_{n_steps}s_pruned.json"
+    else:
+        output_path = os.path.join(output_dir, args.output_filename)
 
     # Read in all data
     trace_json_filepath = os.path.join(current_dir, json_file)
@@ -290,10 +304,8 @@ def main():
     json_data = json.load(f)
 
     # Create DataPruner instance
-    pruner = DataPruner(json_data, rank, time_range=time_range)
+    pruner = DataPruner(json_data, time_range=time_range)
     pruned_json = pruner.parse_json()
-
-    output_path = f"{output_dir}/{app_abr}_{rank}r_{n_steps}s_NEW_pruned.json"
 
     with open(output_path, "w") as out_json:
         json.dump(pruned_json, out_json)

@@ -61,7 +61,7 @@ const GlobalSunBurst = ({ data }) => {
 
         const format = d3.format(",d");
         path.append("title")
-            .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\n${d.data.count} calls\nAverage Duration Per Call ${d.value / d.data.count}\n`);
+            .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\n${d.data.count} calls\nAverage Duration Per Call ${d.value / d.data.count} s\n`);
 
         // const label = svg.append("g")
         //     .attr("pointer-events", "none")
@@ -87,10 +87,10 @@ const GlobalSunBurst = ({ data }) => {
         //     .style("text-anchor", "middle")
         //     .style("font-size", "16px")
         //     .text("testing");
-        
+
         // Handle zoom on click.
         function clicked(event, p) {
-            // d3.select(this).style("pointer-events", "none");
+            d3.select(this).style("pointer-events", "none");
             parent.datum(p.parent || root);
             // parent.select("text")
             //   .text(p.parent ? p.parent.data.name : "");
@@ -117,7 +117,7 @@ const GlobalSunBurst = ({ data }) => {
                 return +this.getAttribute("fill-opacity") || arcVisible(d.target);
             })
                 .attr("fill-opacity", d => arcVisible(d.target) ? (d.children ? 0.9 : 0.7) : 0)
-                .attr("pointer-events", d => arcVisible(d.target) ? "auto" : "none") 
+                .attr("pointer-events", d => arcVisible(d.target) ? "auto" : "none")
 
                 .attrTween("d", d => () => arc(d.current));
             // label.filter(function(d) {
@@ -125,22 +125,22 @@ const GlobalSunBurst = ({ data }) => {
             //   }).transition(t)
             //     .attr("fill-opacity", d => +labelVisible(d.target))
             //     .attrTween("transform", d => () => labelTransform(d.current));
-            // d3.select(this).style("pointer-events", "all");
+            d3.select(this).style("pointer-events", "all");
         }
 
-        // function mouseenter(event, d) {
-        //   d3.select(this).transition()
-        //       .duration("50")
-        //       .attr("stroke", "white")
-        //       .attr("stroke-width", 5);
-        // }
+        function mouseenter(event, d) {
+          d3.select(this).transition()
+              .duration("50")
+              .attr("stroke", "white")
+              .attr("stroke-width", 1);
+        }
 
-        // function mouseleave(event, d) {
-        //   d3.select(this).transition()
-        //       .duration("50")
-        //       .attr("stroke", "none")
-        // }
-        
+        function mouseleave(event, d) {
+          d3.select(this).transition()
+              .duration("50")
+              .attr("stroke", "none")
+        }
+
         function arcVisible(d) {
             return d.y1 <= 3 && d.y0 >= 1 && d.x1 > d.x0;
         }
