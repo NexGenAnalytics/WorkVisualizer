@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -17,6 +18,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Simple helper function
+def get_data_from_json(filepath):
+    assert os.path.isfile(filepath), f"No file found at {filepath}"
+    try:
+        with open(filepath) as f:
+            return json.load(f)
+    except FileNotFoundError as e:
+        sys.exit(f"Could not find {filepath}")
+
+def remove_existing_jsons(directory):
+    for file in os.listdir(directory):
+        file_path = os.path.join(directory, file)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
+
 files_dir = os.path.join(os.getcwd(), "files")
 
 @app.post("/api/upload")
@@ -26,7 +42,8 @@ async def upload_json_trace(file: UploadFile):
             error = Exception('File Type is not JSON.')
             raise error
         contents = file.file.read()
-        subprocess.run(['mkdir', '-p', 'files'])
+        os.makedirs(files_dir, exist_ok=True)
+        remove_existing_jsons(files_dir)
         with open('files/raw_data.json', 'wb') as f:
             f.write(contents)
     except Exception as e:
@@ -36,66 +53,51 @@ async def upload_json_trace(file: UploadFile):
 
     return {"message": f"Successfully uploaded {file.filename}."}
 
-
 @app.get("/api/hierarchy")
 def get_hierarchy_data():
     filename = "hierarchy.json"
     filepath = os.path.join(files_dir, filename)
 
-    if os.path.isfile(filepath):
-        print("Hierarchy data already existed")
-        with open(filepath) as f:
-            return json.load(f)
-
-    else:
+    if not os.path.isfile(filepath):
         print("Creating hierarchy data")
         subprocess.run(["python", "../../../scripts/generate_full_hierarchy_data.py",
                         "-i", os.path.join(files_dir, "raw_data.json"),
                         "-od", os.path.join(files_dir),
                         "-of", filename])
-        return get_hierarchy_data()
+
+    return get_data_from_json(filepath)
 
 @app.get("/api/global_hierarchy")
 def get_global_hierarchy_data():
     filename = "global_hierarchy.json"
     filepath = os.path.join(files_dir, filename)
 
-    if os.path.isfile(filepath):
-        print("Global hierarchy data already existed")
-        with open(filepath) as f:
-            return json.load(f)
-
-    else:
+    if not os.path.isfile(filepath):
         print("Creating global hierarchy data")
         if not os.path.isfile(os.path.join(files_dir, "hierarchy.json")):
             get_hierarchy_data()
-
         subprocess.run(["python", "../../../scripts/generate_global_hierarchy_data.py",
                         "-i", os.path.join(files_dir, "hierarchy.json"),
                         "-od", os.path.join(files_dir),
                         "-of", filename])
-        return get_global_hierarchy_data()
+
+    return get_data_from_json(filepath)
 
 @app.get("/api/spacetime")
 def get_spacetime_data():
     filename = "spacetime.json"
     filepath = os.path.join(files_dir, filename)
 
-    if os.path.isfile(filepath):
-        print("Spacetime data already existed")
-        with open(filepath) as f:
-            return json.load(f)
-
-    else:
+    if not os.path.isfile(filepath):
         print("Creating spacetime data")
         if not os.path.isfile(os.path.join(files_dir, "hierarchy.json")):
             get_hierarchy_data()
-
         subprocess.run(["python", "../../../scripts/generate_spacetime_data.py",
                         "-i", os.path.join(files_dir, "hierarchy.json"),
                         "-od", os.path.join(files_dir),
                         "-of", filename])
-        return get_spacetime_data()
+
+    return get_data_from_json(filepath)
 
 @app.get("/api/util/vizcomponents")
 def get_available_viz_componenents():
