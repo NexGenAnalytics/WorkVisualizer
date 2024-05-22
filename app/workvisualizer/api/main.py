@@ -1,7 +1,8 @@
 import json
 import os
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from typing import List
 from pydantic import BaseModel
 import subprocess
@@ -42,10 +43,12 @@ def get_hierarchy_data():
     filepath = os.path.join(files_dir, filename)
 
     if os.path.isfile(filepath):
+        print("Hierarchy data already existed")
         with open(filepath) as f:
             return json.load(f)
 
     else:
+        print("Creating hierarchy data")
         subprocess.run(["python", "../../../scripts/generate_full_hierarchy_data.py",
                         "-i", os.path.join(files_dir, "raw_data.json"),
                         "-od", os.path.join(files_dir),
@@ -58,10 +61,12 @@ def get_global_hierarchy_data():
     filepath = os.path.join(files_dir, filename)
 
     if os.path.isfile(filepath):
+        print("Global hierarchy data already existed")
         with open(filepath) as f:
             return json.load(f)
 
     else:
+        print("Creating global hierarchy data")
         if not os.path.isfile(os.path.join(files_dir, "hierarchy.json")):
             get_hierarchy_data()
 
@@ -77,10 +82,12 @@ def get_spacetime_data():
     filepath = os.path.join(files_dir, filename)
 
     if os.path.isfile(filepath):
+        print("Spacetime data already existed")
         with open(filepath) as f:
             return json.load(f)
 
     else:
+        print("Creating spacetime data")
         if not os.path.isfile(os.path.join(files_dir, "hierarchy.json")):
             get_hierarchy_data()
 
@@ -89,3 +96,15 @@ def get_spacetime_data():
                         "-od", os.path.join(files_dir),
                         "-of", filename])
         return get_spacetime_data()
+
+@app.get("/api/util/vizcomponents")
+def get_available_viz_componenents():
+    directory_path = os.path.join(os.getcwd(), '..', 'app', 'ui', 'components', 'viz')
+
+    try:
+        files = os.listdir(directory_path)
+        tsx_files = [file for file in files if file.endswith('.tsx')]
+        print(tsx_files)
+        return JSONResponse(content={"components": tsx_files})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

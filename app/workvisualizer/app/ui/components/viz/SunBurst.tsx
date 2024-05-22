@@ -2,6 +2,11 @@
 import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
+export const dataRequirements = {
+    endpoint: '/api/hierarchy', // API endpoint for this component's data
+    params: {} // Additional parameters if needed
+};
+
 const SunBurst = ({ data }) => {
     const ref = useRef();
 

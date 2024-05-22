@@ -1,8 +1,14 @@
 'use client'
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
+import { VisualizationProps } from '@/app/types'
 
-const SpaceTime = ({ data }) => {
+export const dataRequirements = {
+    endpoint: '/api/spacetime', // API endpoint for this component's data
+    params: {} // Additional parameters if needed
+};
+
+const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
     const ref = useRef();
 
     useEffect(() => {
