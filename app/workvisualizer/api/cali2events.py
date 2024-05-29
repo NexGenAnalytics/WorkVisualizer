@@ -35,12 +35,27 @@
 
 # Convert a .cali trace to Google TraceEvent JSON
 
+###################################################################################
+
+# The original script has been edited
+
 import json
 import time
 import sys
+import os
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(script_dir, 'caliper-reader'))
 import caliperreader
 
+all_collectives = ["MPI_Allgather", "MPI_Allgatherv", "MPI_Allreduce", "MPI_Alltoall",
+                   "MPI_Alltoallv", "MPI_Alltoallw", "MPI_Barrier", "MPI_Bcast",
+                   "MPI_Gather", "MPI_Gatherv", "MPI_Iallgather", "MPI_Iallreduce",
+                   "MPI_Ibarrier", "MPI_Ibcast", "MPI_Igather", "MPI_Igatherv",
+                   "MPI_Ireduce", "MPI_Iscatter", "MPI_Iscatterv", "MPI_Reduce",
+                   "MPI_Scatter", "MPI_Scatterv", "MPI_Exscan", "MPI_Op_create",
+                   "MPI_Op_free", "MPI_Reduce_local", "MPI_Reduce_scatter", "MPI_Scan",
+                   "MPI_User_function"]
 
 def _get_first_from_list(rec, attribute_list, fallback=0):
     for attr in attribute_list:
@@ -49,16 +64,16 @@ def _get_first_from_list(rec, attribute_list, fallback=0):
     return fallback
 
 def _get_timestamp(rec):
-    """Get timestamp from rec and convert to microseconds"""
+    """Get timestamp from rec and convert to seconds"""
 
     timestamp_attributes = {
-        "cupti.timestamp"      : 1e-3,
-        "rocm.host.timestamp"  : 1e-3,
-        "time.offset.ns"       : 1e-3,
-        "time.offset"          : 1.0,
-        "gputrace.timestamp"   : 1e-3,
-        "cupti.activity.start" : 1e-3,
-        "rocm.starttime"       : 1e-3
+        "cupti.timestamp"      : 1e-9,
+        "rocm.host.timestamp"  : 1e-9,
+        "time.offset.ns"       : 1e-9,
+        "time.offset"          : 1e-6,
+        "gputrace.timestamp"   : 1e-9,
+        "cupti.activity.start" : 1e-9,
+        "rocm.starttime"       : 1e-9
     }
 
     for attr,factor in timestamp_attributes.items():
@@ -186,7 +201,7 @@ class CaliTraceEventConverter:
             self._process_record(rec[1])
         self.end_timing(ts)
 
-    def write(self, output):
+    def write(self, events_output, metadata_output):
         result = dict(traceEvents=self.records, otherData=self.reader.globals)
 
         if len(self.stackframes.nodes) > 0:
@@ -194,8 +209,12 @@ class CaliTraceEventConverter:
         if len(self.samples) > 0:
             result["samples"] = self.samples
 
+        events_result = sorted(result["traceEvents"], key=lambda event : event["ts"])
+        metadata_result = result["otherData"]
+
         indent = 1 if self.cfg["pretty_print"] else None
-        json.dump(result, output, indent=indent)
+        json.dump(events_result, events_output, indent=indent)
+        json.dump(metadata_result, metadata_output, indent=indent)
         self.written += len(self.records) + len(self.samples)
 
     def sync_timestamps(self):
@@ -308,12 +327,19 @@ class CaliTraceEventConverter:
 
     def _process_event_end_rec(self, rec, loc, key, trec):
         attr = key[len("event.end#"):]
-        btst, path, kernel_type, comm_size, rank = self.rstack[(loc,attr)].pop()
+        btst, path, kernel_type, rank = self.rstack[(loc,attr)].pop()
         tst  = _get_timestamp(rec)
 
         self._get_stackframe(rec, trec)
 
-        trec.update(ph="X", name=rec[key], cat=attr, ts=btst, dur=(tst-btst), path=path, kernel_type=kernel_type, rank=rank)
+        type = "kokkos"
+        if "MPI_" in rec[key]:
+            if rec[key] in all_collectives:
+                type = "collective"
+            else:
+                type = "mpi"
+
+        trec.update(ph="X", name=rec[key], type=type, cat=attr, ts=btst, dur=(tst-btst), path=path, kernel_type=kernel_type, rank=rank)
 
     def _process_cupti_activity_rec(self, rec, trec):
         cat  = rec["cupti.activity.kind"]
@@ -367,80 +393,24 @@ class CaliTraceEventConverter:
             trec.update(sf=sf)
 
 
-helpstr = """Usage: cali2traceevent.py 1.cali 2.cali ... [output.json]
-Options:
---counters          Specify attributes for "counter" records in the form
-                      group=attribute1,attribute2,...
---pretty            Pretty-print output
---sync              Enable time-stamp synchronization
-                      Requires timestamp sync records in the input traces
---pid-attributes    List of process ID attributes
---tid-attributes    List of thread ID attributes
---verbose           Print detailed progress output
-"""
+def convert_cali_to_json(input_files: list, event_output_file, metadata_output_file):
 
-def _parse_args(args):
     cfg = {
-        "output": sys.stdout,
-        "pretty_print": False,
-        "sync_timestamps": False,
+        "event_output": open(event_output_file, "w"),
+        "metadata_output": open(metadata_output_file, "w"),
+        "pretty_print": True,
+        "sync_timestamps": True,
         "counters": {},
         "tid_attributes": [],
         "pid_attributes": [],
         "verbose": False
     }
 
-    while args[0].startswith("-"):
-        arg = args.pop(0)
-        if arg == "--":
-            break
-        if arg == "--sort":
-            # sort is the default now, this switch is deprecated
-            pass
-        elif arg == "--sync":
-            cfg["sync_timestamps"] = True
-        elif arg == "--pretty":
-            cfg["pretty_print"] = True
-        elif arg == "--counters":
-            cfg["counters"].update(_parse_counter_spec(args.pop(0)))
-        elif arg.startswith("--counters="):
-            cfg["counters"].update(_parse_counter_spec(arg[len("--counters="):]))
-        elif arg == "--pid-attributes":
-            cfg["pid_attributes"] = args.pop(0).split(",")
-        elif arg.startswith("--pid-attributes="):
-            cfg["pid_attributes"] = arg[len("--pid-attributes="):].split(",")
-        elif arg == "--tid-attributes":
-            cfg["tid_attributes"] = args.pop(0).split(",")
-        elif arg.startswith("--tid-attributes="):
-            cfg["tid_attributes"] = arg[len("--tid-attributes="):].split(",")
-        elif arg == "--verbose" or arg == "-v":
-            cfg["verbose"] = True
-        elif arg == "--help" or arg == "-h":
-            sys.exit(helpstr)
-        else:
-            sys.exit(f'Unknown argument "{arg}"')
-
-    if len(args) > 1 and args[-1].endswith(".json"):
-        cfg["output"] = open(args.pop(), "w")
-
-    return cfg
-
-def main():
-    args = sys.argv[1:]
-
-    if len(args) < 1:
-        sys.exit(helpstr)
-
-    cfg = _parse_args(args)
-    output = cfg["output"]
     converter = CaliTraceEventConverter(cfg)
 
     begin = time.perf_counter()
 
-    for file in args:
-        if cfg["verbose"]:
-            print("Processing " + file)
-
+    for file in input_files:
         with open(file) as input:
             converter.read_and_sort(input)
 
@@ -450,18 +420,14 @@ def main():
         converter.end_timing(ts)
 
     ts = converter.start_timing("Writing ...")
-    converter.write(output)
+    converter.write(cfg["event_output"], cfg["metadata_output"])
     converter.end_timing(ts)
 
-    if output is not sys.stdout:
-        output.close()
+    cfg["event_output"].close()
+    cfg["metadata_output"].close()
 
     end = time.perf_counter()
     tot = end - begin
     wrt = converter.written
 
     print(f"Done. {wrt} records written. Total {tot:.2f}s.", file=sys.stderr)
-
-
-if __name__ == "__main__":
-    main()

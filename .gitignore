@@ -3,6 +3,7 @@ data/miniem*
 data/pruned/em*
 data/pruned/md*
 data/raw/md*
+data/cali/em*
 plots
 app/workvisualizer/api/files/*
 

@@ -24,7 +24,7 @@ const GlobalSunBurst = ({ data }) => {
         const columns = [
             {
             label: "Total Time Spent in Kernel (s)",
-            value: d => d.duration,
+            value: d => d.dur,
             format,
             x: 580
             },
@@ -108,8 +108,8 @@ const GlobalSunBurst = ({ data }) => {
             const isHighlighted = d3.select(this).classed("highlighted");
 
             // Remove highlight from previously highlighted nodes
-            // svg.selectAll(".highlighted")
-            // .classed("highlighted", false);
+            svg.selectAll(".highlighted")
+            .classed("highlighted", false);
 
             if (!isHighlighted) {
                 d3.select(this)

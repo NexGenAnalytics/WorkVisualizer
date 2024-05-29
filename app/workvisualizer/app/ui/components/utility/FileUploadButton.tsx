@@ -46,7 +46,7 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
                 ref={inputRef}
                 onChange={handleFileChange}
                 className="hidden"
-                accept=".json" // Specify file types
+                accept=".cali" // Specify file types
             />
             <Button
                 color="primary"

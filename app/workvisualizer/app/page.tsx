@@ -1,7 +1,7 @@
 import {useRouter} from "next/router";
 import {Button, Input, Textarea} from "@nextui-org/react";
 import Link from 'next/link'
-import UploadJsonButton from "@/app/ui/components/utility/UploadJsonButton";
+import FileUploadButton from "@/app/ui/components/utility/FileUploadButton";
 import Navigation from "next/navigation";
 import NavBar from "@/app/ui/components/NavBar";
 import Logo from "@/app/ui/components/styling/Logo";
@@ -16,7 +16,7 @@ const Page = () => {
 
             {/* Main Content Section */}
             <main className="flex flex-1 items-center justify-center">
-                <UploadJsonButton redirectOnSuccess={'/dashboard'}></UploadJsonButton>
+                <FileUploadButton redirectOnSuccess={'/dashboard'}></FileUploadButton>
             </main>
 
             {/* Footer Section */}

@@ -25,7 +25,7 @@ const SunBurst = ({ data }) => {
 
         // Compute the layout.
         const hierarchy = d3.hierarchy(data)
-            .sum(d => d.duration)
+            .sum(d => d.dur)
             .sort((a, b) => b.value - a.value);
         const root = d3.partition()
             .size([2 * Math.PI, hierarchy.height + 1])

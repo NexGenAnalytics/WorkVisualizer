@@ -4,7 +4,7 @@ import { Responsive, WidthProvider } from 'react-grid-layout';
 import NavBar from "@/app/ui/components/NavBar";
 import GlobalIndentedTree from '@/app/ui/components/viz/GlobalIndentedTree';
 // import SpaceTime from '@/app/ui/components/viz/SpaceTime';
-import UploadJsonButton from "@/app/ui/components/utility/UploadJsonButton";
+import FileUploadButton from "@/app/ui/components/utility/FileUploadButton";
 import { IoIosStats } from 'react-icons/io';
 import {redirect} from "next/navigation";
 import {ToolBar} from "@/app/ui/components/utility/ToolBar";

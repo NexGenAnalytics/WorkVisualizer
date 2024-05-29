@@ -34,26 +34,31 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .on("start", disableTooltips)
             .on("end", updateChart);
 
+        // Create a unique key combining function name and path
+        data.forEach(d => {
+            d.key = `${d.name} ${d.path}`;
+            d.pathLength = d.path.includes("/") ? d.path.split("/").length + 1 : 0;
+        });
+
+        // Sort unique keys by path length
+        const uniqueKeys = Array.from(new Set(data.map(d => d.key)))
+            .sort((a, b) => a.pathLength - b.pathLength);
+
+        const keyIndexMap = new Map(uniqueKeys.map((key, index) => [key, index]));
 
         // Prepare the scales for positional encoding.
         const x = d3.scaleLinear()
-            .domain(d3.extent(data, d => d.begin_time))
+            .domain(d3.extent(data, d => d.ts))
             .range([marginLeft, width - marginRight]);
 
         const y = d3.scaleLinear()
-            .domain(d3.extent(data, d => d.y_value))
-            .range([height - marginBottom, marginTop]);
+            .domain([0, uniqueKeys.length - 1])
+            .range([marginTop, height - marginBottom]);
 
         // Create the SVG container.
         svg.attr("viewBox", [0, 0, width, height])
            .attr("style", "max-width: 100%; height: auto; font: 10px sans-serif;");
 
-        // Try a different tooltip technique
-        const tooltip = svg
-           .append("text")
-           .attr("class", "tooltip")
-           .attr("fill", "white")
-           .style("pointer-events", "none");
         // try this in the future: https://stackoverflow.com/questions/35652760/styling-d3%C2%B4s-tooltip
 
         // Wrap the SVG with a container that has the html element above it
@@ -121,23 +126,9 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
         //       .attr("x2", width - marginRight));
 
         // Add brushing
-        var brushGroup = svg.append("g")
+        svg.append("g")
             .attr("class", "brush")
             .call(brush);
-
-        // Define a clip to hide any data points outside of the brushed window
-        // svg.append("defs").append("svg:clipPath")
-        //     .attr("id", "clip")
-        //     .append("svg:rect")
-        //     .attr("id", "clip-rect")
-        //     .attr("x", marginLeft)
-        //     .attr("y", marginBottom - 4)
-        //     .attr('width', width - marginLeft - marginRight)
-        //     .attr('height', height - marginBottom - marginTop);
-        // svg.append("g").attr("clip-path", "url(#clip)")
-
-        // A selection for the tooltip
-        // const tooltip = d3.select(container).select(".tooltip");
 
         // Define a function to format the begin, end, and duration times
         function formatTime(time) {
@@ -159,16 +150,16 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
 
             // Define the text in the tooltip
             var tooltip_text = `${d.name}\n
-            Start: ${formatTime(d.begin_time)} s\n
-            End: ${formatTime(d.end_time)} s\n
-            Duration: ${formatTime(d.duration)} s`;
+            Start: ${formatTime(d.ts)} s\n
+            End: ${formatTime(d.ts + d.dur)} s\n
+            Duration: ${formatTime(d.dur)} s`;
             if ("src" in d) {
                 tooltip_text += `\nSource: ${d.src}`;
             }
             if ("dst" in d) {
                 tooltip_text += `\nDestination: ${d.dst}`;
             }
-            if (d.path.length > 0) {
+            if (d.pathLength > 0) {
                 tooltip_text += `\nPath: ${d.path}`;
             }
             const [mx, my] = d3.pointer(event);
@@ -202,12 +193,19 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .selectAll("circle")
             .data(data)
             .join("circle")
-            .attr("cx", d => x(d.begin_time))
-            .attr("cy", d => y(d.y_value))
+            .attr("cx", d => x(d.ts))
+            .attr("cy", d => y(keyIndexMap.get(d.key)))
             .attr("r", 3)
             .attr("fill", d => colorScale(d.type))
             .on('mouseenter', mouseenter)
             .on('mouseleave', mouseleave);
+
+        // Try a different tooltip technique
+        const tooltip = svg
+            .append("text")
+            .attr("class", "tooltip")
+            .attr("fill", "currentColor")
+            .style("pointer-events", "none");
 
         // A function that set idleTimeOut to null
         var idleTimeout
@@ -224,7 +222,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             // If no selection, back to initial coordinate. Otherwise, update X and Y domains
             if (!selection) {
                 if (!idleTimeout) return idleTimeout = setTimeout(idled, 350);
-                x.domain(d3.extent(data, d => d.begin_time));
+                x.domain(d3.extent(data, d => d.ts));
                 y.domain(d3.extent(data, d => d.y_value));
             } else {
 
@@ -247,8 +245,8 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             yAxis.transition().duration(750).call(d3.axisLeft(y)).call(g => g.select(".domain").remove());
             svg.selectAll("circle")
                 .transition().duration(750)
-                .attr("cx", d => x(d.begin_time))
-                .attr("cy", d => y(d.y_value))
+                .attr("cx", d => x(d.ts))
+                .attr("cy", d => y(keyIndexMap.get(d.key)))
                 .on("end", function() {
                     // Re-enable mouse events after transition ends
                     d3.select(this).style("pointer-events", "all");
@@ -266,8 +264,8 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 yAxis.transition().duration(750).call(d3.axisLeft(y)).call(g => g.select(".domain").remove());
                 svg.selectAll("circle")
                     .transition().duration(750)
-                    .attr("cx", d => x(d.begin_time))
-                    .attr("cy", d => y(d.y_value))
+                    .attr("cx", d => x(d.ts))
+                    .attr("cy", d => y(keyIndexMap.get(d.key)))
                     .on("end", function() {
                         d3.select(this).style("pointer-events", "all");
                     });
@@ -313,6 +311,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .attr("x", 15)
             .attr("y", 5)
             .attr("dy", "0.75em")
+            .attr("fill", "currentColor")
             .text(d => d);
 
         // Add a background rectangle for the legend
@@ -321,8 +320,8 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .attr("y", -5)
             .attr("width", 110)
             .attr("height", colorScale.domain().length * 20 + 10)
-            .attr("fill", "white")
-            .attr("opacity", 0.7)
+            .attr("fill", "currentColor")
+            .attr("opacity", 0.5)
             .attr("stroke", "none");
     }, [data]);
 
