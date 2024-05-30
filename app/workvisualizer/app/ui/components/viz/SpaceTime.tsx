@@ -1,5 +1,6 @@
 'use client'
 import React, { useEffect, useRef } from 'react';
+import { useTheme } from "next-themes";
 import * as d3 from 'd3';
 import { VisualizationProps } from '@/app/types'
 
@@ -25,8 +26,8 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
 
         // Define color scale for different types
         const colorScale = d3.scaleOrdinal()
-            .domain(["collective", "mpi", "kokkos"])
-            .range(["#1f77b4","#ff7f0e","#2ca02c"]);
+            .domain(["collective", "mpi", "kokkos", "other"])
+            .range(["#1f77b4","#ff7f0e","#2ca02c", "#a783c9"]);
 
         // Define brush for zooming
         var brush = d3.brush()
@@ -37,13 +38,12 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
         // Create a unique key combining function name and path
         data.forEach(d => {
             d.key = `${d.name} ${d.path}`;
-            d.pathLength = d.path.includes("/") ? d.path.split("/").length + 1 : 0;
+            d.pathLength = d.path != "" ? (d.path.includes("/") ? d.path.split("/").length + 1 : 1) : 0;
         });
 
         // Sort unique keys by path length
-        const uniqueKeys = Array.from(new Set(data.map(d => d.key)))
-            .sort((a, b) => a.pathLength - b.pathLength);
-
+        const sortedData = data.sort((a, b) => a.pathLength - b.pathLength);
+        const uniqueKeys = Array.from(new Set(sortedData.map(d => d.key)));
         const keyIndexMap = new Map(uniqueKeys.map((key, index) => [key, index]));
 
         // Prepare the scales for positional encoding.
@@ -143,10 +143,11 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
         var mouseenter = function(event, d) {
 
             // Enlarge the selected data point and outline in white
+            d3.select(this).raise();
             d3.select(this).transition()
-            .duration('50')
-            .attr("r", 6)
-            .attr("stroke", "white");
+                .duration('50')
+                .attr("r", 6)
+                .attr("stroke", "white");
 
             // Define the text in the tooltip
             var tooltip_text = `${d.name}\n
@@ -163,24 +164,27 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 tooltip_text += `\nPath: ${d.path}`;
             }
             const [mx, my] = d3.pointer(event);
+            const lineHeight = 10;
+            const y_pos = my < (marginBottom + height) / 2 ? 10 : -80;
             tooltip
                 .attr("transform", `translate(${mx}, ${my})`)
                 .selectAll("tspan")
                 .data(tooltip_text.split("\n"))
                 .join("tspan")
-                .attr("dy", "2em")
-                .attr("x", "0px")
+                .attr("x", mx < (marginLeft + width)/2 ? "20px" : "-250px")
+                .attr("y", (d, i) => y_pos + i * lineHeight)
                 .text((text) => text );
         }
 
         // Define a function for when the mouse leaves a data point
         var mouseleave = function (d, i) {
 
+            d3.select(this).lower();
             // Shrink the data point back to its original size and remove the outline
             d3.select(this).transition()
-            .duration('100')
-            .attr("r", 3)
-            .attr("stroke", "none");
+                .duration('100')
+                .attr("r", 3)
+                .attr("stroke", "none");
 
             // Make the tooltip invisible
             tooltip.text("")
@@ -205,7 +209,9 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .append("text")
             .attr("class", "tooltip")
             .attr("fill", "currentColor")
-            .style("pointer-events", "none");
+            .style("pointer-events", "none")
+            .style("font-size", "12px")
+            .style("font-weight", "bold");
 
         // A function that set idleTimeOut to null
         var idleTimeout
@@ -223,7 +229,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             if (!selection) {
                 if (!idleTimeout) return idleTimeout = setTimeout(idled, 350);
                 x.domain(d3.extent(data, d => d.ts));
-                y.domain(d3.extent(data, d => d.y_value));
+                y.domain(d3.extent(data, d => keyIndexMap.get(d.key)));
             } else {
 
                 const zoomState = {
@@ -234,7 +240,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
 
                 // Update x and y domains based on brush selection
                 x.domain([x.invert(selection[0][0]), x.invert(selection[1][0])]);
-                y.domain([y.invert(selection[1][1]), y.invert(selection[0][1])]);
+                y.domain([y.invert(selection[0][1]), y.invert(selection[1][1])]);
 
                 // Clear the brush
                 svg.select(".brush").call(brush.move, null)
@@ -307,11 +313,12 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .attr("fill", colorScale);
 
         // Add text labels
-        legendItems.append("text")
+        const label_text = legendItems.append("text")
             .attr("x", 15)
             .attr("y", 5)
             .attr("dy", "0.75em")
             .attr("fill", "currentColor")
+            .style("font-size", "10px")
             .text(d => d);
 
         // Add a background rectangle for the legend
@@ -320,8 +327,8 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .attr("y", -5)
             .attr("width", 110)
             .attr("height", colorScale.domain().length * 20 + 10)
-            .attr("fill", "currentColor")
-            .attr("opacity", 0.5)
+            .attr("fill", "white")
+            .attr("opacity", 0.3)
             .attr("stroke", "none");
     }, [data]);
 

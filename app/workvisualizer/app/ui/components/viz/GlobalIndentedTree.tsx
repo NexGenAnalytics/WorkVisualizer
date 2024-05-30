@@ -71,11 +71,11 @@ const GlobalSunBurst = ({ data }) => {
         node.append("circle")
             .attr("cx", d => d.depth * nodeSize)
             .attr("r", 2.5)
-            .attr("fill", d => d.children ? "white" : "#999");
+            .attr("fill", d => d.children ? "currentColor" : "#999");
 
         node.append("text")
             .attr("dy", "0.32em")
-            .attr("fill", d => d.children ? "white" : "#999")
+            .attr("fill", d => d.children ? "currentColor" : "#999")
             .attr("x", d => d.depth * nodeSize + 6)
             .text(d => d.data.name);
 
@@ -89,14 +89,14 @@ const GlobalSunBurst = ({ data }) => {
                 .attr("x", x)
                 .attr("text-anchor", "end")
                 .attr("font-weight", "bold")
-                .attr("fill", "white")
+                .attr("fill", "currentColor")
                 .text(label);
 
             node.append("text")
                 .attr("dy", "0.32em")
                 .attr("x", x)
                 .attr("text-anchor", "end")
-                .attr("fill", d => d.children ? "white" : "#999")
+                .attr("fill", d => d.children ? "currentColor" : "#999")
             .data(root.copy().sum(value).descendants())
                 .text(d => format(d.value, d));
         }

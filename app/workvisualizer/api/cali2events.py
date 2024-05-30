@@ -57,6 +57,14 @@ all_collectives = ["MPI_Allgather", "MPI_Allgatherv", "MPI_Allreduce", "MPI_Allt
                    "MPI_Op_free", "MPI_Reduce_local", "MPI_Reduce_scatter", "MPI_Scan",
                    "MPI_User_function"]
 
+counters = {"kokkos": {"total_count": 0, "unique_count": 0, "time": 0.0},
+            "mpi": {"total_count": 0, "unique_count": 0, "time": 0.0},
+            "collective": {"total_count": 0, "unique_count": 0, "time": 0.0},
+            "other": {"total_count": 0, "unique_count": 0, "time": 0.0}}
+
+unique_functions = []
+global_hierarchy_functions = []
+
 def _get_first_from_list(rec, attribute_list, fallback=0):
     for attr in attribute_list:
         if attr in rec:
@@ -201,7 +209,7 @@ class CaliTraceEventConverter:
             self._process_record(rec[1])
         self.end_timing(ts)
 
-    def write(self, events_output, metadata_output):
+    def write(self, events_output, metadata_output, hierarchy_output):
         result = dict(traceEvents=self.records, otherData=self.reader.globals)
 
         if len(self.stackframes.nodes) > 0:
@@ -210,11 +218,28 @@ class CaliTraceEventConverter:
             result["samples"] = self.samples
 
         events_result = sorted(result["traceEvents"], key=lambda event : event["ts"])
+        biggest_events = sorted(result["traceEvents"], key=lambda event : event["dur"], reverse=True)[:10]
         metadata_result = result["otherData"]
-
-        indent = 1 if self.cfg["pretty_print"] else None
+        metadata_result["unique.counts"] = {"kokkos": counters["kokkos"]["unique_count"],
+                                     "mpi_p2p": counters["mpi"]["unique_count"],
+                                     "mpi_collective": counters["collective"]["unique_count"],
+                                     "other": counters["other"]["unique_count"]}
+        metadata_result["total.counts"] = {"kokkos": counters["kokkos"]["total_count"],
+                                     "mpi_p2p": counters["mpi"]["total_count"],
+                                     "mpi_collective": counters["collective"]["total_count"],
+                                     "other": counters["other"]["total_count"]}
+        program_runtime = events_result[-1]["ts"] + events_result[-1]["dur"] - events_result[0]["ts"]
+        metadata_result["program.runtime"] = program_runtime
+        # metadata_result["runtime.breakdown"] = {"kernel.time": counters["kokkos"]["time"],
+        #                                         "mpi_p2p.time": counters["mpi"]["time"],
+        #                                         "mpi_collective.time": counters["collective"]["time"],
+        #                                         "idle.time": program_runtime - counters["kokkos"]["time"] - counters["mpi"]["time"] - counters["collective"]["time"]}
+        metadata_result["biggest.calls"] = [{event["name"]: event["dur"]} for event in biggest_events]
+        metadata_result["hierarchy num events"] = len(global_hierarchy_functions)
+        indent = 4 if self.cfg["pretty_print"] else None
         json.dump(events_result, events_output, indent=indent)
         json.dump(metadata_result, metadata_output, indent=indent)
+        json.dump(global_hierarchy_functions, hierarchy_output, indent=indent)
         self.written += len(self.records) + len(self.samples)
 
     def sync_timestamps(self):
@@ -271,9 +296,13 @@ class CaliTraceEventConverter:
             keys = list(rec.keys())
             for key in keys:
                 if key.startswith("event.begin#"):
+                    if "Kokkos::" in rec[key] or ("MPI_" in rec[key] and rec[key] not in all_collectives) or ("kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]):
+                        continue
                     self._process_event_begin_rec(rec, (pid, tid), key)
                     return
                 if key.startswith("event.end#"):
+                    if "Kokkos::" in rec[key] or ("MPI_" in rec[key] and rec[key] not in all_collectives) or ("kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]):
+                        continue
                     self._process_event_end_rec(rec, (pid, tid), key, trec)
                     break
             else:
@@ -329,17 +358,32 @@ class CaliTraceEventConverter:
         attr = key[len("event.end#"):]
         btst, path, kernel_type, rank = self.rstack[(loc,attr)].pop()
         tst  = _get_timestamp(rec)
+        name = rec[key]
 
         self._get_stackframe(rec, trec)
 
-        type = "kokkos"
-        if "MPI_" in rec[key]:
-            if rec[key] in all_collectives:
+        if "MPI_" in name:
+            if name in all_collectives:
                 type = "collective"
             else:
                 type = "mpi"
+        elif "Kokkos::" in name:
+            type = "kokkos"
+        else:
+            type = "other"
 
-        trec.update(ph="X", name=rec[key], type=type, cat=attr, ts=btst, dur=(tst-btst), path=path, kernel_type=kernel_type, rank=rank)
+        if name not in unique_functions:
+            counters[type]["unique_count"] += 1
+            unique_functions.append(name)
+
+            tmp_name = f"{name} {path}"
+            if tmp_name not in global_hierarchy_functions:
+                global_hierarchy_functions.append(rec)
+
+        counters[type]["time"] += (tst-btst)
+        counters[type]["total_count"] += 1
+
+        trec.update(ph="X", name=name, type=type, cat=attr, ts=btst, dur=(tst-btst), path=path, kernel_type=kernel_type, rank=rank)
 
     def _process_cupti_activity_rec(self, rec, trec):
         cat  = rec["cupti.activity.kind"]
@@ -393,11 +437,12 @@ class CaliTraceEventConverter:
             trec.update(sf=sf)
 
 
-def convert_cali_to_json(input_files: list, event_output_file, metadata_output_file):
+def convert_cali_to_json(input_files: list, event_output_file, metadata_output_file, hierarchy_ftns_output_file):
 
     cfg = {
         "event_output": open(event_output_file, "w"),
         "metadata_output": open(metadata_output_file, "w"),
+        "hierarchy_ftns_output": open(hierarchy_ftns_output_file, "w"),
         "pretty_print": True,
         "sync_timestamps": True,
         "counters": {},
@@ -420,7 +465,7 @@ def convert_cali_to_json(input_files: list, event_output_file, metadata_output_f
         converter.end_timing(ts)
 
     ts = converter.start_timing("Writing ...")
-    converter.write(cfg["event_output"], cfg["metadata_output"])
+    converter.write(cfg["event_output"], cfg["metadata_output"], cfg["hierarchy_ftns_output"])
     converter.end_timing(ts)
 
     cfg["event_output"].close()
