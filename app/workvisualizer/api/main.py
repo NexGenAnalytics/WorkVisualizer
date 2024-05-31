@@ -43,7 +43,7 @@ def unpack_cali():
     input_files = [os.path.join(files_dir, file) for file in os.listdir(files_dir) if file.endswith(".cali")]
     if len(input_files) == 0:
         return {"message": "No input .cali file was found."}
-    convert_cali_to_json(input_files, os.path.join(files_dir, "events.json"), os.path.join(files_dir, "metadata.json"), os.path.join(files_dir, "hierarchy_ftns.json"))
+    convert_cali_to_json(input_files, os.path.join(files_dir, "events.json"), os.path.join(files_dir, "metadata.json"), os.path.join(files_dir, "unique_events.json"))
 
 @app.post("/api/upload")
 async def upload_json_trace(file: UploadFile):

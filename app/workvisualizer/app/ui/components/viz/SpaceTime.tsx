@@ -35,15 +35,9 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .on("start", disableTooltips)
             .on("end", updateChart);
 
-        // Create a unique key combining function name and path
-        data.forEach(d => {
-            d.key = `${d.name} ${d.path}`;
-            d.pathLength = d.path != "" ? (d.path.includes("/") ? d.path.split("/").length + 1 : 1) : 0;
-        });
-
         // Sort unique keys by path length
-        const sortedData = data.sort((a, b) => a.pathLength - b.pathLength);
-        const uniqueKeys = Array.from(new Set(sortedData.map(d => d.key)));
+        const sortedData = data.sort((a, b) => a.depth - b.depth);
+        const uniqueKeys = Array.from(new Set(sortedData.map(d => d.ftn_id)));
         const keyIndexMap = new Map(uniqueKeys.map((key, index) => [key, index]));
 
         // Prepare the scales for positional encoding.
@@ -160,7 +154,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             if ("dst" in d) {
                 tooltip_text += `\nDestination: ${d.dst}`;
             }
-            if (d.pathLength > 0) {
+            if (d.depth > 0) {
                 tooltip_text += `\nPath: ${d.path}`;
             }
             const [mx, my] = d3.pointer(event);
@@ -198,7 +192,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .data(data)
             .join("circle")
             .attr("cx", d => x(d.ts))
-            .attr("cy", d => y(keyIndexMap.get(d.key)))
+            .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
             .attr("r", 3)
             .attr("fill", d => colorScale(d.type))
             .on('mouseenter', mouseenter)
@@ -229,7 +223,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             if (!selection) {
                 if (!idleTimeout) return idleTimeout = setTimeout(idled, 350);
                 x.domain(d3.extent(data, d => d.ts));
-                y.domain(d3.extent(data, d => keyIndexMap.get(d.key)));
+                y.domain(d3.extent(data, d => keyIndexMap.get(d.ftn_id)));
             } else {
 
                 const zoomState = {
@@ -252,7 +246,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             svg.selectAll("circle")
                 .transition().duration(750)
                 .attr("cx", d => x(d.ts))
-                .attr("cy", d => y(keyIndexMap.get(d.key)))
+                .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
                 .on("end", function() {
                     // Re-enable mouse events after transition ends
                     d3.select(this).style("pointer-events", "all");
@@ -271,7 +265,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 svg.selectAll("circle")
                     .transition().duration(750)
                     .attr("cx", d => x(d.ts))
-                    .attr("cy", d => y(keyIndexMap.get(d.key)))
+                    .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
                     .on("end", function() {
                         d3.select(this).style("pointer-events", "all");
                     });

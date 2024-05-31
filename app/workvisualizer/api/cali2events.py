@@ -57,13 +57,15 @@ all_collectives = ["MPI_Allgather", "MPI_Allgatherv", "MPI_Allreduce", "MPI_Allt
                    "MPI_Op_free", "MPI_Reduce_local", "MPI_Reduce_scatter", "MPI_Scan",
                    "MPI_User_function"]
 
+event_id_iterator = 0
+
 counters = {"kokkos": {"total_count": 0, "unique_count": 0, "time": 0.0},
             "mpi": {"total_count": 0, "unique_count": 0, "time": 0.0},
             "collective": {"total_count": 0, "unique_count": 0, "time": 0.0},
             "other": {"total_count": 0, "unique_count": 0, "time": 0.0}}
 
 unique_functions = []
-global_hierarchy_functions = []
+global_hierarchy_records = {}
 
 def _get_first_from_list(rec, attribute_list, fallback=0):
     for attr in attribute_list:
@@ -235,11 +237,11 @@ class CaliTraceEventConverter:
         #                                         "mpi_collective.time": counters["collective"]["time"],
         #                                         "idle.time": program_runtime - counters["kokkos"]["time"] - counters["mpi"]["time"] - counters["collective"]["time"]}
         metadata_result["biggest.calls"] = [{event["name"]: event["dur"]} for event in biggest_events]
-        metadata_result["hierarchy num events"] = len(global_hierarchy_functions)
+
         indent = 4 if self.cfg["pretty_print"] else None
         json.dump(events_result, events_output, indent=indent)
         json.dump(metadata_result, metadata_output, indent=indent)
-        json.dump(global_hierarchy_functions, hierarchy_output, indent=indent)
+        json.dump(list(global_hierarchy_records.values()), hierarchy_output, indent=indent)
         self.written += len(self.records) + len(self.samples)
 
     def sync_timestamps(self):
@@ -267,7 +269,7 @@ class CaliTraceEventConverter:
         if self.cfg["verbose"]:
             print(f" done ({tot:.2f}s).", file=sys.stderr)
 
-    def _process_record(self, rec):
+    def _process_record(self, rec, path_depth = 5):
         pid  = int(_get_first_from_list(rec, self.pid_attributes))
         tid  = int(_get_first_from_list(rec, self.tid_attributes))
 
@@ -295,18 +297,16 @@ class CaliTraceEventConverter:
         else:
             keys = list(rec.keys())
             for key in keys:
-                if key.startswith("event.begin#"):
-                    if "Kokkos::" in rec[key] or ("MPI_" in rec[key] and rec[key] not in all_collectives) or ("kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]):
-                        continue
+                if "Kokkos::" in rec[key] or ("MPI_" in rec[key] and rec[key] not in all_collectives) or ("kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]):
+                    continue
+                if key.startswith("event.begin#") and ("path" in keys and len(rec["path"]) < path_depth):
                     self._process_event_begin_rec(rec, (pid, tid), key)
                     return
-                if key.startswith("event.end#"):
-                    if "Kokkos::" in rec[key] or ("MPI_" in rec[key] and rec[key] not in all_collectives) or ("kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]):
-                        continue
+                if key.startswith("event.end#") and  ("path" in keys and 1 < len(rec["path"]) < path_depth + 1):
                     self._process_event_end_rec(rec, (pid, tid), key, trec)
                     break
-            else:
-                self.skipped += 1
+                else:
+                    self.skipped += 1
 
         if "name" in trec:
             self.records.append(trec)
@@ -340,23 +340,30 @@ class CaliTraceEventConverter:
         attr = key[len("event.begin#"):]
         tst  = _get_timestamp(rec)
 
-        raw_path = rec.get("path", "")
-        raw_kernel_type = rec.get("kernel_type", "")
-        path = "/".join(raw_path) if isinstance(raw_path, list) and len(raw_path) > 1 else raw_path
-        kernel_type = "/".join(raw_kernel_type) if isinstance(raw_kernel_type, list) and len(raw_kernel_type) > 1 else raw_kernel_type
+        raw_path = rec.get("path", [])
+        raw_kernel_type = rec.get("kernel_type", [])
+        path = "/".join(raw_path) if isinstance(raw_path, list) and len(raw_path) > 1 else ""
+        kernel_type = "/".join(raw_kernel_type) if isinstance(raw_kernel_type, list) and len(raw_kernel_type) > 1 else ""
+
+        global event_id_iterator
+        eid = event_id_iterator
+        event_id_iterator += 1
+
+        ftn_id = f"{rec[key]} {path}"
+        depth = len(raw_path)
 
         rank = int(rec.get("mpi.rank"))
 
         skey = (loc,attr)
 
         if skey in self.rstack:
-            self.rstack[skey].append((tst, path, kernel_type, rank))
+            self.rstack[skey].append((tst, path, kernel_type, rank, eid, ftn_id, depth))
         else:
-            self.rstack[skey] = [ (tst, path, kernel_type, rank) ]
+            self.rstack[skey] = [ (tst, path, kernel_type, rank, eid, ftn_id, depth) ]
 
     def _process_event_end_rec(self, rec, loc, key, trec):
         attr = key[len("event.end#"):]
-        btst, path, kernel_type, rank = self.rstack[(loc,attr)].pop()
+        btst, path, kernel_type, rank, eid, ftn_id, depth = self.rstack[(loc,attr)].pop()
         tst  = _get_timestamp(rec)
         name = rec[key]
 
@@ -372,18 +379,23 @@ class CaliTraceEventConverter:
         else:
             type = "other"
 
+        counters[type]["time"] += (tst-btst)
+        counters[type]["total_count"] += 1
+
+        # Removed from trec: {ph="X", cat=attr}
+        trec.update(name=name, eid=eid, ftn_id=ftn_id, depth=depth, type=type, ts=btst, dur=(tst-btst), path=path, kernel_type=kernel_type, rank=rank)
+
         if name not in unique_functions:
             counters[type]["unique_count"] += 1
             unique_functions.append(name)
 
-            tmp_name = f"{name} {path}"
-            if tmp_name not in global_hierarchy_functions:
-                global_hierarchy_functions.append(rec)
+        if ftn_id not in global_hierarchy_records:
+            global_hierarchy_records[ftn_id] = trec
+            global_hierarchy_records[ftn_id]["count"] = 0
+        else:
+            global_hierarchy_records[ftn_id]["dur"] += (tst-btst)
+            global_hierarchy_records[ftn_id]["count"] += 1
 
-        counters[type]["time"] += (tst-btst)
-        counters[type]["total_count"] += 1
-
-        trec.update(ph="X", name=name, type=type, cat=attr, ts=btst, dur=(tst-btst), path=path, kernel_type=kernel_type, rank=rank)
 
     def _process_cupti_activity_rec(self, rec, trec):
         cat  = rec["cupti.activity.kind"]
