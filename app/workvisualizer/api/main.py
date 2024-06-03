@@ -10,7 +10,7 @@ import subprocess
 
 from cali2events import convert_cali_to_json
 from events2hierarchy import events_to_hierarchy
-from hierarchy2global import hierarchy_to_global_hierarchy
+from logical_hierarchy import generate_logical_hierarchy_from_root
 
 app = FastAPI()
 
@@ -87,21 +87,19 @@ def get_hierarchy_data():
 
     return get_data_from_json(filepath)
 
-@app.get("/api/global_hierarchy")
-def get_global_hierarchy_data():
-    filename = "global_hierarchy.json"
+@app.get("/api/logical_hierarchy")
+def get_logical_hierarchy_data():
+    root = ""
+    desc = "full" if root == "" else root
+    filename = f"logical_hierarchy_{desc}.json"
     filepath = os.path.join(files_dir, filename)
 
-    events_file = os.path.join(files_dir, "events.json")
-    hierarchy_file = os.path.join(files_dir, "hierarchy.json")
+    unique_events_file = os.path.join(files_dir, "unique_events.json")
 
     if not os.path.isfile(filepath):
-        if not os.path.isfile(hierarchy_file):
-            if not os.path.isfile(events_file):
-                unpack_cali()
-            events_to_hierarchy(events_file, hierarchy_file)
-        hierarchy_to_global_hierarchy(hierarchy_file, os.path.join(files_dir, "global_hierarchy.json"))
-
+        if not os.path.isfile(unique_events_file):
+            unpack_cali()
+        generate_logical_hierarchy_from_root(os.path.join(filepath), ftn_id=root)
     return get_data_from_json(filepath)
 
 @app.get("/api/util/vizcomponents")
