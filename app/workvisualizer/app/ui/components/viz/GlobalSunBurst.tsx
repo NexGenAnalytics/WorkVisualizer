@@ -21,7 +21,9 @@ const GlobalSunBurst = ({ data }) => {
 
         // Create the color scale.
         // const color = d3.scaleOrdinal(d3.quantize(d3.interpolateRainbow, data.children.length + 1));
-        const color = d3.scaleOrdinal(d3.quantize(d3.interpolateTurbo, data.children.length + 1).reverse());
+        const colorScale = d3.scaleOrdinal()
+            .domain(["collective", "mpi", "kokkos", "other"])
+            .range(["#1f77b4","#ff7f0e","#2ca02c", "#a783c9"]);
 
         // Compute the layout.
         const hierarchy = d3.hierarchy(data)
@@ -51,7 +53,7 @@ const GlobalSunBurst = ({ data }) => {
             .selectAll("path")
             .data(root.descendants().slice(1))
             .join("path")
-            .attr("fill", d => { while (d.depth > 1) d = d.parent; return color(d.value); })
+            .attr("fill", d => colorScale(d.data.type))
             .attr("fill-opacity", d => arcVisible(d.current) ? (d.children ? 0.9 : 0.7) : 0)
             .attr("pointer-events", d => arcVisible(d.current) ? "auto" : "none")
 

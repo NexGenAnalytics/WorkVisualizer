@@ -16,7 +16,7 @@ class LogicalHierarchy:
         self.unique_events = json.load(f)
 
     def create_hierarchy(self):
-        found_root = False
+        found_root = True if self.ftn_id == "" else False
         for event in self.unique_events:
 
             if event["ftn_id"] == self.ftn_id:
