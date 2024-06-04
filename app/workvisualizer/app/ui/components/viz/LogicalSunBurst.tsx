@@ -68,7 +68,9 @@ const GlobalSunBurst = ({ data }) => {
 
         const format = d3.format(",d");
         path.append("title")
-            .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\nTotal Time: ${d.data.dur} s\n${d.data.count} calls\nAverage Duration Per Call ${d.data.dur / d.data.count} s\n`);
+            .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\n
+                        Total Time: ${d.data.dur} s\n${d.data.count} calls\n
+                        Average Duration Per Call ${d.data.dur / d.data.count} s\n`);
 
         // const label = svg.append("g")
         //     .attr("pointer-events", "none")

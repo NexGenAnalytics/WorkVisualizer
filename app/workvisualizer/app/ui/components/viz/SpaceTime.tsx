@@ -147,7 +147,8 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             var tooltip_text = `${d.name}\n
             Start: ${formatTime(d.ts)} s\n
             End: ${formatTime(d.ts + d.dur)} s\n
-            Duration: ${formatTime(d.dur)} s`;
+            Duration: ${formatTime(d.dur)} s\n
+            Rank: ${d.rank}`;
             if ("src" in d) {
                 tooltip_text += `\nSource: ${d.src}`;
             }

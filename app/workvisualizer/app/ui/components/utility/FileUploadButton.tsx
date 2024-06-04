@@ -18,10 +18,12 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
     };
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files ? event.target.files[0] : null;
-        if (file) {
+        const files = event.target.files;
+        if (files && files.length > 0) {
             const formData = new FormData();
-            formData.append('file', file, file.name);
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i], files[i].name);
+            }
 
             try {
                 const response = await axios.post('http://127.0.0.1:8000/api/upload', formData, {
@@ -42,7 +44,7 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
     return (
         <div className="flex flex-col items-center justify-center p-4">
             <input
-                type="file"
+                type="file" multiple
                 ref={inputRef}
                 onChange={handleFileChange}
                 className="hidden"
