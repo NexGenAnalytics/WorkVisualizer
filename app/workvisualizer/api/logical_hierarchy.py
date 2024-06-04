@@ -14,6 +14,19 @@ class LogicalHierarchy:
         f = open(os.path.join(os.getcwd(), "files", "unique_events.json"))
         self.unique_events = json.load(f)
 
+        # Make sure the ftn_id exists
+        if self.ftn_id != "":
+            found_id = False
+            for event in self.unique_events:
+                if event["ftn_id"] == self.ftn_id:
+                    found_id = True
+                    break
+
+            # TODO: improve warning/error handling
+            # If we can't find the id, do the full hierarchy
+            if not found_id:
+                self.ftn_id = ""
+
     def create_hierarchy(self):
         found_root = True if self.ftn_id == "" else False
         for event in self.unique_events:
