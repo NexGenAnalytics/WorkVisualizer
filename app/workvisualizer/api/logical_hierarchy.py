@@ -38,20 +38,20 @@ class LogicalHierarchy:
                 found_root = True
 
             if not found_root:
-                print(f"eid {event['eid']}; root not found")
+                print(f"ftn_id {event['ftn_id']}; root not found")
                 continue
 
-            if event["eid"] in self.handled_events:
+            if event["ftn_id"] in self.handled_events:
                 continue
 
             elif self.ftn_id == "" or self.root_name in event["path"].split("/"):
                 # Populate children_list at this level of path
                 children_list = []
-                self.handled_events.append(event["eid"])
+                self.handled_events.append(event["ftn_id"])
                 for other_event in self.unique_events:
                     if other_event["path"] == event["path"]:
                         children_list.append(other_event)
-                        self.handled_events.append(other_event["eid"])
+                        self.handled_events.append(other_event["ftn_id"])
 
                 # Take care of top level node
                 if (event["path"] == self.root_name):

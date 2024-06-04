@@ -34,13 +34,13 @@ def get_data_from_json(filepath):
         sys.exit(f"Could not find {filepath}")
 
 def remove_existing_files(directory):
-    for file in os.listdir(directory):
-        file_path = os.path.join(directory, file)
-        if os.path.isfile(file_path):
-            os.remove(file_path)
+    for filename in os.listdir(directory):
+        filepath = os.path.join(directory, filename)
+        if os.path.isfile(filepath):
+            os.remove(filepath)
 
 def unpack_cali():
-    input_files = [os.path.join(files_dir, file) for file in os.listdir(files_dir) if file.endswith(".cali")]
+    input_files = [os.path.join(files_dir, filename) for filename in os.listdir(files_dir) if filename.endswith(".cali")]
     if len(input_files) == 0:
         return {"message": "No input .cali file was found."}
     convert_cali_to_json(input_files, files_dir)
