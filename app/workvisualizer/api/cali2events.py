@@ -65,6 +65,7 @@ counters = {"kokkos": {"total_count": 0, "unique_count": 0, "time": 0.0},
             "other": {"total_count": 0, "unique_count": 0, "time": 0.0}}
 
 unique_functions = []
+known_ftns = []
 global_hierarchy_records = {}
 
 def _get_first_from_list(rec, attribute_list, fallback=0):
@@ -241,7 +242,7 @@ class CaliTraceEventConverter:
         indent = 4 if self.cfg["pretty_print"] else None
         json.dump(events_result, events_output, indent=indent)
         json.dump(metadata_result, metadata_output, indent=indent)
-        json.dump(list(global_hierarchy_records.values()), hierarchy_output, indent=indent)
+        json.dump(sorted(list((global_hierarchy_records.values())), key=lambda e : e["depth"]), hierarchy_output, indent=indent)
         self.written += len(self.records) + len(self.samples)
 
     def sync_timestamps(self):
@@ -269,7 +270,7 @@ class CaliTraceEventConverter:
         if self.cfg["verbose"]:
             print(f" done ({tot:.2f}s).", file=sys.stderr)
 
-    def _process_record(self, rec, path_depth = 5):
+    def _process_record(self, rec):
         pid  = int(_get_first_from_list(rec, self.pid_attributes))
         tid  = int(_get_first_from_list(rec, self.tid_attributes))
 
@@ -297,12 +298,12 @@ class CaliTraceEventConverter:
         else:
             keys = list(rec.keys())
             for key in keys:
-                if "Kokkos::" in rec[key] or ("MPI_" in rec[key] and rec[key] not in all_collectives) or ("kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]):
+                if "kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]:
                     continue
-                if key.startswith("event.begin#") and ("path" in keys and len(rec["path"]) < path_depth):
+                if key.startswith("event.begin#"):
                     self._process_event_begin_rec(rec, (pid, tid), key)
                     return
-                if key.startswith("event.end#") and  ("path" in keys and 1 < len(rec["path"]) < path_depth + 1):
+                if key.startswith("event.end#"):
                     self._process_event_end_rec(rec, (pid, tid), key, trec)
                     break
                 else:
@@ -342,14 +343,20 @@ class CaliTraceEventConverter:
 
         raw_path = rec.get("path", [])
         raw_kernel_type = rec.get("kernel_type", [])
-        path = "/".join(raw_path) if isinstance(raw_path, list) and len(raw_path) > 1 else ""
-        kernel_type = "/".join(raw_kernel_type) if isinstance(raw_kernel_type, list) and len(raw_kernel_type) > 1 else ""
+        path = "/".join(raw_path) if isinstance(raw_path, list) and len(raw_path) > 0 else ""
+        kernel_type = "/".join(raw_kernel_type) if isinstance(raw_kernel_type, list) and len(raw_kernel_type) > 0 else ""
 
         global event_id_iterator
         eid = event_id_iterator
         event_id_iterator += 1
 
-        ftn_id = f"{rec[key]} {path}"
+        identifier = f"{rec[key]} {path}"
+        if identifier not in known_ftns:
+            known_ftns.append(identifier)
+            ftn_id = known_ftns.index(identifier)
+        else:
+            ftn_id = known_ftns.index(identifier)
+
         depth = len(raw_path)
 
         rank = int(rec.get("mpi.rank"))
