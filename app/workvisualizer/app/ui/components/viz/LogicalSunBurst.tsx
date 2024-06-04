@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
 export const dataRequirements = {
-    endpoint: '/api/logical_hierarchy', // API endpoint for this component's data
+    endpoint: '/api/logical_hierarchy/-1', // API endpoint for this component's data
     params: {} // Additional parameters if needed
 };
 
@@ -68,7 +68,7 @@ const GlobalSunBurst = ({ data }) => {
 
         const format = d3.format(",d");
         path.append("title")
-            .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\n${d.data.count} calls\nAverage Duration Per Call ${d.data.dur / d.data.count} s\n`);
+            .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\nTotal Time: ${d.data.dur} s\n${d.data.count} calls\nAverage Duration Per Call ${d.data.dur / d.data.count} s\n`);
 
         // const label = svg.append("g")
         //     .attr("pointer-events", "none")
@@ -161,6 +161,47 @@ const GlobalSunBurst = ({ data }) => {
             const y = (d.y0 + d.y1) / 2 * radius;
             return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
         }
+
+        // LEGEND
+
+        // // Create a legend
+        // const legend = svg.append("g")
+        //     .attr("class", "legend")
+        //     .attr("transform", `translate(40, 20)`); // Adjust the position of the legend
+
+        // // Add legend items
+        // const legendItems = legend.selectAll(".legend-item")
+        //     .data(colorScale.domain())
+        //     .enter().append("g")
+        //     .attr("class", "legend-item")
+        //     .attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+        // // Add colored rectangles
+        // legendItems.append("rect")
+        //     .attr("x", 0)
+        //     .attr("width", 10)
+        //     .attr("height", 10)
+        //     .attr("fill", colorScale);
+
+        // // Add text labels
+        // legendItems.append("text")
+        //     .attr("x", 15)
+        //     .attr("y", 5)
+        //     .attr("dy", "0.75em")
+        //     .attr("fill", "currentColor")
+        //     .style("font-size", "10px")
+        //     .text(d => d);
+
+        // // Add a background rectangle for the legend
+        // legend.insert("rect", ":first-child")
+        //     .attr("x", -5)
+        //     .attr("y", -5)
+        //     .attr("width", 110)
+        //     .attr("height", colorScale.domain().length * 20 + 10)
+        //     .attr("fill", "white")
+        //     .attr("opacity", 0.3)
+        //     .attr("stroke", "none");
+
     }, [data]);
 
     return (

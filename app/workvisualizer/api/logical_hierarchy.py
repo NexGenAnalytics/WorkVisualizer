@@ -4,9 +4,8 @@ import json
 
 class LogicalHierarchy:
 
-    def __init__(self, ftn_id: str = ""):
-        self.ftn_id = ftn_id
-        print("ftn_id: ", self.ftn_id)
+    def __init__(self, ftn_id: int = -1):
+        self.ftn_id = "" if ftn_id == -1 else ftn_id
         self.root_name = ""
         self.handled_events = []
 
@@ -33,12 +32,6 @@ class LogicalHierarchy:
                 continue
 
             elif self.ftn_id == "" or self.root_name in event["path"].split("/"):
-                print("event[name]: ", event["name"])
-                print(event["path"].split("/"))
-                print("self.root_name in event['path'].split('/'): ", self.root_name in event["path"].split("/"))
-                print("--------------------------------------")
-                print(f"Creating children list for {event['eid']}")
-                print(f"  Path: {event['path']}")
                 # Populate children_list at this level of path
                 children_list = []
                 self.handled_events.append(event["eid"])
@@ -46,12 +39,6 @@ class LogicalHierarchy:
                     if other_event["path"] == event["path"]:
                         children_list.append(other_event)
                         self.handled_events.append(other_event["eid"])
-
-                print()
-                print(f"All events with same path: {event['path']}")
-                print_list = [e["eid"] for e in children_list]
-                print(print_list)
-                print()
 
                 # Take care of top level node
                 if (event["path"] == self.root_name):
@@ -63,17 +50,13 @@ class LogicalHierarchy:
                     next_current_list = []
                     iter = 1
                     path_splits = event["path"].split("/")
-                    print("path_splits: ", path_splits)
                     if self.root_name != "":
                         target_idx = path_splits.index(self.root_name)
                         path_splits = path_splits[target_idx:]
-                        print("sliced path splits: ", path_splits)
                     for path_step in path_splits:
                         names_of_current_list = [e["name"] for e in current_list]
-                        # print(f"Looking for {path_step} in {names_of_current_list}")
                         for parent in current_list:
                             if parent["name"] == path_step:
-                                print(f"Found a parent: {parent['name']}")
                                 if iter == len(path_splits):
                                     parent["children"] = children_list
                                     break
@@ -84,7 +67,7 @@ class LogicalHierarchy:
 
         return self.hierarchy
 
-def generate_logical_hierarchy_from_root(output_file, ftn_id: str = ""):
+def generate_logical_hierarchy_from_root(output_file, ftn_id: int = -1):
     hierarchy_generator = LogicalHierarchy(ftn_id)
     hierarchy = hierarchy_generator.create_hierarchy()
 

@@ -65,6 +65,7 @@ counters = {"kokkos": {"total_count": 0, "unique_count": 0, "time": 0.0},
             "other": {"total_count": 0, "unique_count": 0, "time": 0.0}}
 
 unique_functions = []
+known_ftns = []
 global_hierarchy_records = {}
 
 def _get_first_from_list(rec, attribute_list, fallback=0):
@@ -349,7 +350,13 @@ class CaliTraceEventConverter:
         eid = event_id_iterator
         event_id_iterator += 1
 
-        ftn_id = f"{rec[key]} {path}"
+        identifier = f"{rec[key]} {path}"
+        if identifier not in known_ftns:
+            known_ftns.append(identifier)
+            ftn_id = known_ftns.index(identifier)
+        else:
+            ftn_id = known_ftns.index(identifier)
+
         depth = len(raw_path)
 
         rank = int(rec.get("mpi.rank"))

@@ -87,10 +87,9 @@ def get_hierarchy_data():
 
     return get_data_from_json(filepath)
 
-@app.get("/api/logical_hierarchy")
-def get_logical_hierarchy_data():
-    root = ""
-    desc = "full" if root == "" else root
+@app.get("/api/logical_hierarchy/{ftn_id}")
+def get_logical_hierarchy_data(ftn_id):
+    desc = "full" if ftn_id == -1 else ftn_id
     filename = f"logical_hierarchy_{desc}.json"
     filepath = os.path.join(files_dir, filename)
 
@@ -99,7 +98,7 @@ def get_logical_hierarchy_data():
     if not os.path.isfile(filepath):
         if not os.path.isfile(unique_events_file):
             unpack_cali()
-        generate_logical_hierarchy_from_root(os.path.join(filepath), ftn_id=root)
+        generate_logical_hierarchy_from_root(os.path.join(filepath), ftn_id=int(ftn_id))
     return get_data_from_json(filepath)
 
 @app.get("/api/util/vizcomponents")
