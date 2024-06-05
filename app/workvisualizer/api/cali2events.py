@@ -181,6 +181,14 @@ class CaliTraceEventConverter:
         self.skipped = 0
         self.written = 0
 
+        # These keep track of metadata
+        self.event_id_iterator = 0
+        self.event_counters = {}
+        self.unique_functions = []
+        self.known_ftns = []
+        self.known_ranks = []
+        self.unique_events_dict = {}
+
     def read(self, filename_or_stream):
         self.reader.read(filename_or_stream, self._process_record)
 
@@ -215,19 +223,19 @@ class CaliTraceEventConverter:
             result["samples"] = self.samples
 
         events_result = sorted(result["traceEvents"], key=lambda event : event["ts"])
-        biggest_events = sorted(list(unique_events_dict.values()), key=lambda event : event["dur"], reverse=True)[:10]
+        biggest_events = sorted(list(self.unique_events_dict.values()), key=lambda event : event["dur"], reverse=True)[:10]
         metadata_result = result["otherData"]
         metadata_result["unique.counts"] = {}
         metadata_result["total.counts"] = {}
-        for rank in known_ranks:
-            metadata_result["unique.counts"][f"rank.{rank}"] = {"kokkos": counters[rank]["kokkos"]["unique_count"],
-                                                                "mpi_p2p": counters[rank]["mpi"]["unique_count"],
-                                                                "mpi_collective": counters[rank]["collective"]["unique_count"],
-                                                                "other": counters[rank]["other"]["unique_count"]}
-            metadata_result["total.counts"][f"rank.{rank}"] = {"kokkos": counters[rank]["kokkos"]["total_count"],
-                                                               "mpi_p2p": counters[rank]["mpi"]["total_count"],
-                                                               "mpi_collective": counters[rank]["collective"]["total_count"],
-                                                               "other": counters[rank]["other"]["total_count"]}
+        for rank in self.known_ranks:
+            metadata_result["unique.counts"][f"rank.{rank}"] = {"kokkos": self.event_counters[rank]["kokkos"]["unique_count"],
+                                                                "mpi_p2p": self.event_counters[rank]["mpi"]["unique_count"],
+                                                                "mpi_collective": self.event_counters[rank]["collective"]["unique_count"],
+                                                                "other": self.event_counters[rank]["other"]["unique_count"]}
+            metadata_result["total.counts"][f"rank.{rank}"] = {"kokkos": self.event_counters[rank]["kokkos"]["total_count"],
+                                                               "mpi_p2p": self.event_counters[rank]["mpi"]["total_count"],
+                                                               "mpi_collective": self.event_counters[rank]["collective"]["total_count"],
+                                                               "other": self.event_counters[rank]["other"]["total_count"]}
         program_runtime = events_result[-1]["ts"] + events_result[-1]["dur"] - events_result[0]["ts"]
         metadata_result["program.runtime"] = program_runtime
         metadata_result["biggest.calls"] = biggest_events
@@ -235,7 +243,7 @@ class CaliTraceEventConverter:
         indent = 4 if self.cfg["pretty_print"] else None
         json.dump(events_result, events_output, indent=indent)
         json.dump(metadata_result, metadata_output, indent=indent)
-        json.dump(sorted(list((unique_events_dict.values())), key=lambda e : e["depth"]), hierarchy_output, indent=indent)
+        json.dump(sorted(list((self.unique_events_dict.values())), key=lambda e : e["depth"]), hierarchy_output, indent=indent)
         self.written += len(self.records) + len(self.samples)
 
     def sync_timestamps(self):
@@ -339,24 +347,22 @@ class CaliTraceEventConverter:
         path = "/".join(raw_path) if isinstance(raw_path, list) and len(raw_path) > 0 else ""
         kernel_type = "/".join(raw_kernel_type) if isinstance(raw_kernel_type, list) and len(raw_kernel_type) > 0 else ""
 
-        global event_id_iterator
-        eid = event_id_iterator
-        event_id_iterator += 1
+        eid = self.event_id_iterator
+        self.event_id_iterator += 1
 
         identifier = f"{rec[key]} {path}"
-        if identifier not in known_ftns:
-            known_ftns.append(identifier)
-            ftn_id = known_ftns.index(identifier)
+        if identifier not in self.known_ftns:
+            self.known_ftns.append(identifier)
+            ftn_id = self.known_ftns.index(identifier)
         else:
-            ftn_id = known_ftns.index(identifier)
+            ftn_id = self.known_ftns.index(identifier)
 
         depth = len(raw_path)
 
         rank = int(rec.get("mpi.rank"))
-        global known_ranks
-        if rank not in known_ranks:
-            known_ranks.append(rank)
-            counters[rank] = counts_template_dict
+        if rank not in self.known_ranks:
+            self.known_ranks.append(rank)
+            self.event_counters[rank] = counts_template_dict
 
         skey = (loc,attr)
 
@@ -384,30 +390,30 @@ class CaliTraceEventConverter:
         else:
             type = "other"
 
-        counters[rank][type]["time"] += (tst-btst)
-        counters[rank][type]["total_count"] += 1
+        self.event_counters[rank][type]["time"] += (tst-btst)
+        self.event_counters[rank][type]["total_count"] += 1
 
         # Removed from trec: {ph="X", cat=attr}
         trec.update(name=name, eid=eid, ftn_id=ftn_id, depth=depth, type=type, ts=btst, dur=dur, path=path, kernel_type=kernel_type, rank=rank)
 
-        if name not in unique_functions:
-            counters[rank][type]["unique_count"] += 1
-            unique_functions.append(name)
+        if name not in self.unique_functions:
+            self.event_counters[rank][type]["unique_count"] += 1
+            self.unique_functions.append(name)
 
-        if ftn_id not in unique_events_dict:
-            unique_events_dict[ftn_id] = trec
-            unique_events_dict[ftn_id]["count"] = 1
-            unique_events_dict[ftn_id]["rank_info"] = {rank: {"count": 1, "dur": dur}}
-            del unique_events_dict[ftn_id]["rank"]
-            del unique_events_dict[ftn_id]["eid"]
+        if ftn_id not in self.unique_events_dict:
+            self.unique_events_dict[ftn_id] = trec
+            self.unique_events_dict[ftn_id]["count"] = 1
+            self.unique_events_dict[ftn_id]["rank_info"] = {rank: {"count": 1, "dur": dur}}
+            del self.unique_events_dict[ftn_id]["rank"]
+            del self.unique_events_dict[ftn_id]["eid"]
         else:
-            unique_events_dict[ftn_id]["dur"] += dur
-            unique_events_dict[ftn_id]["count"] += 1
-            if rank not in unique_events_dict[ftn_id]["rank_info"]:
-                unique_events_dict[ftn_id]["rank_info"][rank] = {"count": 1, "dur": dur}
+            self.unique_events_dict[ftn_id]["dur"] += dur
+            self.unique_events_dict[ftn_id]["count"] += 1
+            if rank not in self.unique_events_dict[ftn_id]["rank_info"]:
+                self.unique_events_dict[ftn_id]["rank_info"][rank] = {"count": 1, "dur": dur}
             else:
-                unique_events_dict[ftn_id]["rank_info"][rank]["count"] += 1
-                unique_events_dict[ftn_id]["rank_info"][rank]["dur"] += dur
+                self.unique_events_dict[ftn_id]["rank_info"][rank]["count"] += 1
+                self.unique_events_dict[ftn_id]["rank_info"][rank]["dur"] += dur
 
 
 
@@ -464,19 +470,6 @@ class CaliTraceEventConverter:
 
 
 def convert_cali_to_json(input_files: list, files_dir: str):
-
-    global event_id_iterator
-    event_id_iterator = 0
-    global counters
-    counters = {}
-    global unique_functions
-    unique_functions = []
-    global known_ftns
-    known_ftns = []
-    global known_ranks
-    known_ranks = []
-    global unique_events_dict
-    unique_events_dict = {}
 
     event_output_file = os.path.join(files_dir, "events.json")
     metadata_output_file = os.path.join(files_dir, "metadata.json")
