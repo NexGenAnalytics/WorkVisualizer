@@ -227,6 +227,7 @@ class CaliTraceEventConverter:
         metadata_result = result["otherData"]
         metadata_result["unique.counts"] = {}
         metadata_result["total.counts"] = {}
+        agg_counts = {"total_count": {}, "unique_count": {}, "time": {}}
         for rank in self.known_ranks:
             metadata_result["unique.counts"][f"rank.{rank}"] = {"kokkos": self.event_counters[rank]["kokkos"]["unique_count"],
                                                                 "mpi_p2p": self.event_counters[rank]["mpi"]["unique_count"],
@@ -236,6 +237,18 @@ class CaliTraceEventConverter:
                                                                "mpi_p2p": self.event_counters[rank]["mpi"]["total_count"],
                                                                "mpi_collective": self.event_counters[rank]["collective"]["total_count"],
                                                                "other": self.event_counters[rank]["other"]["total_count"]}
+            for call_type in self.event_counters[rank].keys():
+                for key, val in self.event_counters[rank][call_type].items():
+                    if call_type not in agg_counts[key]:
+                        agg_counts[key][call_type] = val
+                    else:
+                        agg_counts[key][call_type] += val
+
+        avg_unique_counts = {"average": {key: val/len(self.known_ranks) for key, val in agg_counts["unique_count"].items()}}
+        avg_total_counts = {"average": {key: val/len(self.known_ranks) for key, val in agg_counts["total_count"].items()}}
+
+        metadata_result["unique.counts"].update(avg_unique_counts)
+        metadata_result["total.counts"].update(avg_total_counts)
         program_runtime = events_result[-1]["ts"] + events_result[-1]["dur"] - events_result[0]["ts"]
         metadata_result["program.runtime"] = program_runtime
         metadata_result["biggest.calls"] = biggest_events
