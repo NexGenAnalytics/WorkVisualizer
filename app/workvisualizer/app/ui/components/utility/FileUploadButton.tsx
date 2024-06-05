@@ -54,7 +54,7 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
                 color="primary"
                 onClick={handleButtonClick}
             >
-                Upload File
+                Upload File(s)
             </Button>
         </div>
     );

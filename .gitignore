@@ -1,10 +1,5 @@
-data/raw/em*
-data/miniem*
-data/pruned/em*
-data/pruned/md*
-data/raw/md*
-data/cali/em*
-plots
+data
+!data/cali/md*
+misc/plots
+misc/hierarchies
 app/workvisualizer/api/files/*
-
-!data/raw/md_0r_100s_alltrace.json
