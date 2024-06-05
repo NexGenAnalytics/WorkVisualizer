@@ -34,34 +34,35 @@ def get_data_from_json(filepath):
         sys.exit(f"Could not find {filepath}")
 
 def remove_existing_files(directory):
-    for file in os.listdir(directory):
-        file_path = os.path.join(directory, file)
-        if os.path.isfile(file_path):
-            os.remove(file_path)
+    for filename in os.listdir(directory):
+        filepath = os.path.join(directory, filename)
+        if os.path.isfile(filepath):
+            os.remove(filepath)
 
 def unpack_cali():
-    input_files = [os.path.join(files_dir, file) for file in os.listdir(files_dir) if file.endswith(".cali")]
+    input_files = [os.path.join(files_dir, filename) for filename in os.listdir(files_dir) if filename.endswith(".cali")]
     if len(input_files) == 0:
         return {"message": "No input .cali file was found."}
-    convert_cali_to_json(input_files, os.path.join(files_dir, "events.json"), os.path.join(files_dir, "metadata.json"), os.path.join(files_dir, "unique_events.json"))
+    convert_cali_to_json(input_files, files_dir)
 
 @app.post("/api/upload")
-async def upload_json_trace(file: UploadFile):
-    try:
-        contents = file.file.read()
-        os.makedirs(files_dir, exist_ok=True)
-        remove_existing_files(files_dir)
-        with open(f'{files_dir}/input_data.cali', 'wb') as f:
-            f.write(contents)
-    except Exception as e:
-        return {"message": f"There was an error uploading the file: {e}"}
-    finally:
-        file.file.close()
+async def upload_cali_files(files: list[UploadFile] = File(...)):
+    os.makedirs(files_dir, exist_ok=True)
+    remove_existing_files(files_dir)
+    for file in files:
+        try:
+            contents = await file.read()
+            with open(f"{files_dir}/{file.filename}", "wb") as f:
+                f.write(contents)
+        except Exception as e:
+            return {"message": f"There was an error uploading {file.filename}: {e}"}
+        finally:
+            await file.close()
 
     # Then get the initial data
     unpack_cali()
 
-    return {"message": f"Successfully uploaded {file.filename}."}
+    return {"message": "Successfully uploaded files."}
 
 @app.get("/api/spacetime")
 def get_spacetime_data():
