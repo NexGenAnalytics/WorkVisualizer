@@ -7,6 +7,7 @@ import GlobalIndentedTree from "@/app/ui/components/viz/GlobalIndentedTree";
 import LogicalSunBurst from "@/app/ui/components/viz/LogicalSunBurst";
 import SpaceTime from "@/app/ui/components/viz/SpaceTime";
 import SunBurst from "@/app/ui/components/viz/SunBurst";
+import SummaryTable from "@/app/ui/components/viz/SummaryTable";
 
 interface Plot {
     key: string;
@@ -21,6 +22,7 @@ const plots: Plot[] = [
     { key: 'logicalSunBurst', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1'} },
     { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime'} },
     { key: 'sunBurst', plot: { label: 'Sun Burst', endpoint: '/api/hierarchy'} },
+    { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata' } },
 ];
 
 export default function Page() {
@@ -47,8 +49,8 @@ export default function Page() {
     return (
         <div className='h-screen '>
             <NavBar/>
-            <div className='flex'>
-                <div className="flex flex-col p-4 min-w-fit">
+            <div className='flex flex-row h-screen'>
+                <div className="flex flex-col p-4 min-w-fit h-screen">
                     <Checkbox
                         className="min-w-full"
                         isSelected={isIndentedTreeSelected}
@@ -64,13 +66,18 @@ export default function Page() {
                         onSelectionChange={(keys) => setSelectedPlot(Array.from(keys))}
                         className="min-w-full pt-4"
                     >
-                        {plots.filter(plot => plot.key !== 'globalIndentedTree').map((plot) => (
+                        {plots.filter(plot => plot.key !== 'globalIndentedTree' && plot.key !== 'summaryTable').map((plot) => (
                             <SelectItem key={plot.key}>{plot.plot.label}</SelectItem>
                         ))}
                     </Select>
+                    <Spacer y={5}/>
+                    <Divider orientation='horizontal'/>
+                    <Spacer y={2}/>
+                    {plotData['summaryTable'] ? <SummaryTable data={plotData['summaryTable']} /> : null}
+                    {/*<p className="text-xs">{JSON.stringify(plotData['summaryTable'])}</p>*/}
                 </div>
                 <Divider orientation='vertical'/>
-                <div className="flex flex-row p-4">
+                <div className="flex flex-row p-4 bg-slate-950">
                     <div className="overflow-auto">
                         {isIndentedTreeSelected && plotData['globalIndentedTree'] ? <GlobalIndentedTree data={plotData['globalIndentedTree']} /> : null}
                     </div>
