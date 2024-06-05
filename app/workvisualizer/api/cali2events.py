@@ -57,19 +57,10 @@ all_collectives = ["MPI_Allgather", "MPI_Allgatherv", "MPI_Allreduce", "MPI_Allt
                    "MPI_Op_free", "MPI_Reduce_local", "MPI_Reduce_scatter", "MPI_Scan",
                    "MPI_User_function"]
 
-event_id_iterator = 0
-
-counters = {}
-
 counts_template_dict = {"kokkos": {"total_count": 0, "unique_count": 0, "time": 0.0},
                         "mpi": {"total_count": 0, "unique_count": 0, "time": 0.0},
                         "collective": {"total_count": 0, "unique_count": 0, "time": 0.0},
                         "other": {"total_count": 0, "unique_count": 0, "time": 0.0}}
-
-unique_functions = []
-known_ftns = []
-known_ranks = []
-unique_events_dict = {}
 
 def _get_first_from_list(rec, attribute_list, fallback=0):
     for attr in attribute_list:
@@ -473,6 +464,19 @@ class CaliTraceEventConverter:
 
 
 def convert_cali_to_json(input_files: list, files_dir: str):
+
+    global event_id_iterator
+    event_id_iterator = 0
+    global counters
+    counters = {}
+    global unique_functions
+    unique_functions = []
+    global known_ftns
+    known_ftns = []
+    global known_ranks
+    known_ranks = []
+    global unique_events_dict
+    unique_events_dict = {}
 
     event_output_file = os.path.join(files_dir, "events.json")
     metadata_output_file = os.path.join(files_dir, "metadata.json")
