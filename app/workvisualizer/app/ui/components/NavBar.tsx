@@ -3,6 +3,7 @@ import React from "react";
 import {Navbar, NavbarBrand, NavbarContent, NavbarItem, NavbarMenuToggle, NavbarMenu, NavbarMenuItem, Link, Button, Spacer} from "@nextui-org/react";
 import Logo from './styling/Logo'
 import DarkModeToggle from '@/app/ui/components/utility/DarkModeToggle'
+import {Link2} from "lucide-react";
 
 export default function NavBar() {
     const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -20,6 +21,7 @@ export default function NavBar() {
             isMenuOpen={isMenuOpen}
             onMenuOpenChange={setIsMenuOpen}
             // className="background"
+            position="static"
         >
             <NavbarContent className="flex-grow justify-start">
                 <NavbarMenuToggle
@@ -27,7 +29,9 @@ export default function NavBar() {
                     // className="sm:hidden"
                 />
                 <NavbarBrand>
-                    <Logo />
+                    <Link href="/">
+                        <Logo />
+                    </Link>
                     <Spacer x={4} />
                     <p className="font-bold text-3xl">WorkVisualizer</p>
                 </NavbarBrand>

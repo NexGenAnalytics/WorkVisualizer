@@ -1,3 +1,4 @@
+'use client'
 import React from "react";
 import {Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, RadioGroup, Radio} from "@nextui-org/react";
 
@@ -6,7 +7,7 @@ export const dataRequirements = {
     params: {} // Additional parameters if needed
 };
 
-export default function App({ data }) {
+export default function SummaryTable({ data }) {
   const [selectedColor, setSelectedColor] = React.useState("default");
 
   // Define a function to format the begin, end, and duration times
@@ -38,7 +39,7 @@ export default function App({ data }) {
   return (
     <div className="flex flex-col gap-3">
 
-      <p className="font-bold text-2xl">Program Information</p>
+      <p className="font-bold text-medium">Program Information</p>
 
       <Table
         hideHeader
@@ -63,7 +64,7 @@ export default function App({ data }) {
         </TableBody>
       </Table>
 
-      <p className="font-bold text-2xl">Call Distribution (averaged across ranks)</p>
+      <p className="font-bold text-medium">Call Distribution (averaged across ranks)</p>
 
       <Table
         color={selectedColor}
@@ -87,7 +88,7 @@ export default function App({ data }) {
         </TableBody>
       </Table>
 
-      <p className="font-bold text-2xl">Largest Calls (averaged across ranks)</p>
+      <p className="font-bold text-medium">Largest Calls (averaged across ranks)</p>
 
       <Table
         color={selectedColor}

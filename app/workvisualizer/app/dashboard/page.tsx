@@ -1,101 +1,101 @@
 'use client'
-import React, {useState, useCallback, useEffect} from 'react';
-import { Responsive, WidthProvider } from 'react-grid-layout';
+import React, { useState, useEffect } from 'react';
 import NavBar from "@/app/ui/components/NavBar";
-import GlobalIndentedTree from '@/app/ui/components/viz/GlobalIndentedTree';
-// import SpaceTime from '@/app/ui/components/viz/SpaceTime';
-import FileUploadButton from "@/app/ui/components/utility/FileUploadButton";
-import { IoIosStats } from 'react-icons/io';
-import {redirect} from "next/navigation";
-import {ToolBar} from "@/app/ui/components/utility/ToolBar";
-import {Divider} from "@nextui-org/divider";
-import {Spacer} from "@nextui-org/react";
-import {Spinner} from "@nextui-org/react";
-import dynamic from 'next/dynamic';
-import {VisualizationProps} from "@/app/types";
+import {Divider, Spacer} from "@nextui-org/react";
+import {Select, SelectItem, Checkbox} from "@nextui-org/react";
+import GlobalIndentedTree from "@/app/ui/components/viz/GlobalIndentedTree";
+import LogicalSunBurst from "@/app/ui/components/viz/LogicalSunBurst";
+import SpaceTime from "@/app/ui/components/viz/SpaceTime";
+import SunBurst from "@/app/ui/components/viz/SunBurst";
+import SummaryTable from "@/app/ui/components/viz/SummaryTable";
 
-// const ResponsiveGridLayout = WidthProvider(Responsive);
+interface Plot {
+    key: string;
+    plot: {
+        label: string;
+        endpoint: string;
+    }
+}
+
+const plots: Plot[] = [
+    { key: 'globalIndentedTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1' } },
+    { key: 'logicalSunBurst', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1'} },
+    { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime'} },
+    { key: 'sunBurst', plot: { label: 'Sun Burst', endpoint: '/api/hierarchy'} },
+    { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata' } },
+];
 
 export default function Page() {
-    const [selectedPlots, setSelectedPlots] = useState([]);
-    const [plotsData, setPlotsData] = useState({});
+    const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
+    const [isIndentedTreeSelected, setIsIndentedTreeSelected] = useState(false);
+    const [plotData, setPlotData] = useState<any>({});
 
     useEffect(() => {
-        async function fetchData(plot) {
-            if (plotsData[plot]?.data || plotsData[plot]?.isLoading) return; // Avoid refetching or fetching if already loading
-
-            // Start loading
-            setPlotsData(prev => ({ ...prev, [plot]: { isLoading: true } }));
-
-            try {
-                const module = await import(`@/app/ui/components/viz/${plot}`);
-                const { dataRequirements } = module;
-                const response = await fetch('http://127.0.0.1:8000' + dataRequirements.endpoint, {
-                    method: 'GET',
-                });
+        async function fetchData() {
+            const responses = await Promise.all(plots.map(async (plot) => {
+                const response = await fetch(plot.plot.endpoint);
                 const data = await response.json();
-
-                // Set data
-                setPlotsData(prev => ({ ...prev, [plot]: { data, isLoading: false } }));
-            } catch (error) {
-                console.error('Failed to fetch data for:', plot);
-                setPlotsData(prev => ({ ...prev, [plot]: { isLoading: false, error } }));
-            }
+                return { key: plot.key, data };
+            }));
+            const dataMap: any = {};
+            responses.forEach(res => {
+                dataMap[res.key] = res.data;
+            });
+            setPlotData(dataMap);
         }
-
-        selectedPlots.forEach(plot => {
-            fetchData(plot);
-        });
-
-    }, [selectedPlots]);
-
-    const handlePlotSelectionChange = useCallback((selectedKeys: Iterable<never> | ArrayLike<never>) => {
-        setSelectedPlots(Array.from(selectedKeys));
+        fetchData();
     }, []);
 
     return (
-        <>
+        <div className='h-screen '>
             <NavBar/>
-            <div className='flex h-screen'>
-                <ToolBar onPlotSelectionChange={handlePlotSelectionChange}/>
+            <div className='flex flex-row h-screen'>
+                <div className="flex flex-col p-4 min-w-fit h-screen">
+                    <Checkbox
+                        className="min-w-full"
+                        isSelected={isIndentedTreeSelected}
+                        onValueChange={setIsIndentedTreeSelected}
+                    >
+                        Global Indented Tree
+                    </Checkbox>
+                    <Select
+                        label="Select Plots"
+                        variant="bordered"
+                        placeholder="Select plots"
+                        selectedKeys={selectedPlot}
+                        onSelectionChange={(keys) => setSelectedPlot(Array.from(keys))}
+                        className="min-w-full pt-4"
+                    >
+                        {plots.filter(plot => plot.key !== 'globalIndentedTree' && plot.key !== 'summaryTable').map((plot) => (
+                            <SelectItem key={plot.key}>{plot.plot.label}</SelectItem>
+                        ))}
+                    </Select>
+                    <Spacer y={5}/>
+                    <Divider orientation='horizontal'/>
+                    <Spacer y={2}/>
+                    {plotData['summaryTable'] ? <SummaryTable data={plotData['summaryTable']} /> : null}
+                    {/*<p className="text-xs">{JSON.stringify(plotData['summaryTable'])}</p>*/}
+                </div>
                 <Divider orientation='vertical'/>
-                <div className="flex flex-row items-center">
-                    {selectedPlots.map((plot) => {
-                        const PlotComponent = dynamic(() => import(`@/app/ui/components/viz/${plot}`).then(mod => mod.default));
-                        const plotInfo = plotsData[plot];
-
-                        if (!plotInfo || plotInfo.isLoading) {
-                            return <Spinner size="lg"/>;
-                        } else if (plotInfo.error) {
-                            return <div key={plot}>Error loading {plot}</div>;
-                        }
-
-                        return <PlotComponent key={plot} data={plotInfo.data}/>;
-                    })}
+                <div className="flex flex-row p-4 bg-slate-950">
+                    <div className="overflow-auto">
+                        {isIndentedTreeSelected && plotData['globalIndentedTree'] ? <GlobalIndentedTree data={plotData['globalIndentedTree']} /> : null}
+                    </div>
+                    {isIndentedTreeSelected && plotData['globalIndentedTree'] ? <Spacer x={2}/> : null}
+                    {isIndentedTreeSelected && plotData['globalIndentedTree'] ? <Divider orientation='vertical' /> : null}
+                    <Spacer x={2}/>
+                    <div className="overflow-auto">
+                        {selectedPlot.map((key) => {
+                            const PlotComponent = {
+                                'logicalSunBurst': LogicalSunBurst,
+                                'spaceTime': SpaceTime,
+                                'sunBurst': SunBurst
+                            }[key];
+                            return PlotComponent ? <PlotComponent data={plotData[key]} /> : null;
+                        })}
+                    </div>
                 </div>
             </div>
-        </>
+        </div>
     );
-}
-
-
-async function getData() {
-    try {
-        const res = await fetch('http://127.0.0.1:8000/api/spacetime')
-
-        if (!res.ok) {
-            throw new Error('Failed to fetch data')
-        }
-        const jsonData = await res.json();
-
-        if (jsonData.message === "No file was uploaded.") {
-            console.log(jsonData.message);
-            // setError('No file was uploaded.');
-            redirect('/'); // Redirecting to the landing page
-        }
-
-        return jsonData
-    } catch (error) {
-        console.error(error)
-    }
 }
