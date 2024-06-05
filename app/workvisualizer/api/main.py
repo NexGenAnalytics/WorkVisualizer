@@ -64,6 +64,16 @@ async def upload_cali_files(files: list[UploadFile] = File(...)):
 
     return {"message": "Successfully uploaded files."}
 
+@app.get("/api/metadata")
+def get_metadata():
+    filename = "metadata.json"
+    filepath = os.path.join(files_dir, filename)
+
+    if not os.path.isfile(filepath):
+        unpack_cali()
+
+    return get_data_from_json(filepath)
+
 @app.get("/api/spacetime")
 def get_spacetime_data():
     filename = "events.json"
