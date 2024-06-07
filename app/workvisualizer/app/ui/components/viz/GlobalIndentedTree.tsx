@@ -21,18 +21,23 @@ const GlobalIndentedTree = ({ data }) => {
         const width = 928;
         const height = (nodes.length + 1) * nodeSize;
 
+        // Define color scale for different types
+        const colorScale = d3.scaleOrdinal()
+            .domain(["collective", "mpi", "kokkos", "other"])
+            .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#a783c9"]);
+
         const columns = [
             {
-            label: "Total Time Spent in Kernel (s)",
-            value: d => d.dur,
-            format,
-            x: 580
+                label: "Seconds Spent in Kernel",
+                value: d => d.dur,
+                format,
+                x: 580
             },
             {
-            label: "# of Instances",
-            value: d => d.count,
-            format: (value, d) => d.count ? format(value) : "-",
-            x: 700
+                label: "# of Instances",
+                value: d => d.count,
+                format: (value, d) => d.count ? format(value) : "-",
+                x: 700
             }
         ];
 
@@ -40,12 +45,11 @@ const GlobalIndentedTree = ({ data }) => {
             .attr("width", width)
             .attr("height", height)
             .attr("viewBox", [-nodeSize / 2, -nodeSize * 3 / 2, width, height])
-            .attr("style", "max-width: 100%; height: auto; font: 10px sans-serif; overflow: visible;");
+            .attr("style", "max-width: 100%; height: auto; font: 12px sans-serif; overflow: visible;");
 
         svg.append("style")
             .text(`
             .highlighted text {
-                fill: #2b93db; /* Change the text color */
                 font-weight: bold; /* Make the text bold */
             }
             `);
@@ -82,7 +86,7 @@ const GlobalIndentedTree = ({ data }) => {
         node.append("title")
             .text(d => d.ancestors().reverse().map(d => d.data.name).join("/"));
 
-        for (const {label, value, format, x} of columns) {
+        for (const { label, value, format, x } of columns) {
             svg.append("text")
                 .attr("dy", "0.32em")
                 .attr("y", -nodeSize)
@@ -97,29 +101,35 @@ const GlobalIndentedTree = ({ data }) => {
                 .attr("x", x)
                 .attr("text-anchor", "end")
                 .attr("fill", d => d.children ? "currentColor" : "#999")
-            .data(root.copy().sum(value).descendants())
+                .data(root.copy().sum(value).descendants())
                 .text(d => format(d.value, d));
         }
 
         node.on("click", clicked);
 
         function clicked(event, d) {
-
             const isHighlighted = d3.select(this).classed("highlighted");
 
             // Remove highlight from previously highlighted nodes
             svg.selectAll(".highlighted")
-            .classed("highlighted", false);
+                .classed("highlighted", false)
+                .selectAll("text")
+                .attr("fill", d => d.children ? "currentColor" : "#999");
 
             if (!isHighlighted) {
                 d3.select(this)
-                  .classed("highlighted", true)
-                  .raise(); // Bring the highlighted node to the front
+                    .classed("highlighted", true)
+                    .raise(); // Bring the highlighted node to the front
+
+                d3.select(this).selectAll("text")
+                    .attr("fill", colorScale(d.data.type));
             } else {
                 d3.select(this)
-                  .classed("highlighted", false);
-            }
+                    .classed("highlighted", false);
 
+                d3.select(this).selectAll("text")
+                    .attr("fill", d => d.children ? "currentColor" : "#999");
+            }
         }
 
     }, [data]);

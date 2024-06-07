@@ -4,14 +4,14 @@ import json
 
 class LogicalHierarchy:
 
-    def __init__(self, ftn_id: int = -1):
+    def __init__(self, events_file, ftn_id: int = -1):
         self.ftn_id = "" if ftn_id == -1 else ftn_id
         self.root_name = ""
         self.handled_events = []
 
         self.hierarchy = {"name": "root", "children": []}
 
-        f = open(os.path.join(os.getcwd(), "files", "unique_events.json"))
+        f = open(events_file)
         self.unique_events = json.load(f)
 
         # Make sure the ftn_id exists
@@ -80,8 +80,8 @@ class LogicalHierarchy:
 
         return self.hierarchy
 
-def generate_logical_hierarchy_from_root(output_file, ftn_id: int = -1):
-    hierarchy_generator = LogicalHierarchy(ftn_id)
+def generate_logical_hierarchy_from_root(events_file, output_file, ftn_id: int = -1):
+    hierarchy_generator = LogicalHierarchy(events_file, ftn_id)
     hierarchy = hierarchy_generator.create_hierarchy()
 
     with open(output_file, "w") as out_json:

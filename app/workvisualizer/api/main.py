@@ -64,8 +64,9 @@ async def upload_cali_files(files: list[UploadFile] = File(...)):
 
     return {"message": "Successfully uploaded files."}
 
-@app.get("/api/metadata")
-def get_metadata():
+# This endpoint doesn't use the RANK at all for now
+@app.get("/api/metadata/{rank}")
+def get_metadata(rank):
     filename = "metadata.json"
     filepath = os.path.join(files_dir, filename)
 
@@ -74,42 +75,50 @@ def get_metadata():
 
     return get_data_from_json(filepath)
 
-@app.get("/api/spacetime")
-def get_spacetime_data():
-    filename = "events.json"
+@app.get("/api/spacetime/{rank}")
+def get_spacetime_data(rank):
+    filename = f"events-{rank}.json"
     filepath = os.path.join(files_dir, filename)
 
     if not os.path.isfile(filepath):
         unpack_cali()
 
+    if not os.path.isfile(filepath):
+        # TODO: Add error that rank wasn't found
+        pass
+
     return get_data_from_json(filepath)
 
-@app.get("/api/hierarchy")
-def get_hierarchy_data():
-    filename = "hierarchy.json"
+@app.get("/api/hierarchy/{rank}")
+def get_hierarchy_data(rank):
+    filename = f"hierarchy-{rank}.json"
     filepath = os.path.join(files_dir, filename)
 
-    events_file = os.path.join(files_dir, "events.json")
+    events_file = os.path.join(files_dir, f"events-{rank}.json")
 
     if not os.path.isfile(filepath):
         if not os.path.isfile(events_file):
             unpack_cali()
-        events_to_hierarchy(events_file, os.path.join(files_dir, "hierarchy.json"))
+        events_to_hierarchy(events_file, filepath)
 
     return get_data_from_json(filepath)
 
-@app.get("/api/logical_hierarchy/{ftn_id}")
-def get_logical_hierarchy_data(ftn_id):
-    desc = "full" if ftn_id == -1 else ftn_id
-    filename = f"logical_hierarchy_{desc}.json"
+@app.get("/api/logical_hierarchy/{ftn_id}/{rank}")
+def get_logical_hierarchy_data(ftn_id, rank):
+    depth_desc = "full" if ftn_id == "-1" else ftn_id
+    rank_desc = "all" if rank == "-1" else rank
+    filename = f"logical_hierarchy_rank_{rank_desc}_depth_{depth_desc}.json"
     filepath = os.path.join(files_dir, filename)
 
-    unique_events_file = os.path.join(files_dir, "unique_events.json")
-
+    unique_events_file = os.path.join(files_dir, f"unique-events-{rank_desc}.json")
+    print(unique_events_file)
     if not os.path.isfile(filepath):
         if not os.path.isfile(unique_events_file):
             unpack_cali()
-        generate_logical_hierarchy_from_root(os.path.join(filepath), ftn_id=int(ftn_id))
+        if not os.path.isfile(unique_events_file):
+            # TODO: throw an error for missing rank
+            pass
+        generate_logical_hierarchy_from_root(unique_events_file, os.path.join(filepath), ftn_id=int(ftn_id))
     return get_data_from_json(filepath)
 
 @app.get("/api/util/vizcomponents")

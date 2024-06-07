@@ -187,6 +187,7 @@ class CaliTraceEventConverter:
         self.unique_functions = []
         self.known_ftns = []
         self.known_ranks = []
+        self.rank_unique_events_dict = {}
         self.unique_events_dict = {}
 
     def read(self, filename_or_stream):
@@ -214,17 +215,26 @@ class CaliTraceEventConverter:
             self._process_record(rec[1])
         self.end_timing(ts)
 
-    def write(self, events_output, metadata_output, hierarchy_output):
-        result = dict(traceEvents=self.records, otherData=self.reader.globals)
+    def write(self, files_dir):
+
+        event_output_files = {rank: os.path.join(files_dir, f"events-{rank}.json") for rank in self.known_ranks}
+        unique_events_output_files = {rank: os.path.join(files_dir, f"unique-events-{rank}.json") for rank in self.known_ranks}
+        metadata_output_file = os.path.join(files_dir, "metadata.json")
+        unique_events_output_file = os.path.join(files_dir, "unique-events-all.json")
 
         if len(self.stackframes.nodes) > 0:
             result["stackFrames"] = self.stackframes.get_stackframes()
         if len(self.samples) > 0:
             result["samples"] = self.samples
 
-        events_result = sorted(result["traceEvents"], key=lambda event : event["ts"])
+        events_result = sorted(self.records, key=lambda event : event["ts"])
+        # Separate into rank specific lists
+        events_per_rank = {rank: [] for rank in self.known_ranks}
+        for event in events_result:
+            events_per_rank[event["rank"]].append(event)
+        # TODO: look in every rank for biggest events (not just 0)
         biggest_events = sorted(list(self.unique_events_dict.values()), key=lambda event : event["dur"], reverse=True)[:10]
-        metadata_result = result["otherData"]
+        metadata_result = self.reader.globals
         metadata_result["unique.counts"] = {}
         metadata_result["total.counts"] = {}
         agg_counts = {"total_count": {}, "unique_count": {}, "time": {}}
@@ -254,9 +264,17 @@ class CaliTraceEventConverter:
         metadata_result["biggest.calls"] = biggest_events
 
         indent = 4 if self.cfg["pretty_print"] else None
-        json.dump(events_result, events_output, indent=indent)
-        json.dump(metadata_result, metadata_output, indent=indent)
-        json.dump(sorted(list((self.unique_events_dict.values())), key=lambda e : e["depth"]), hierarchy_output, indent=indent)
+
+        for rank in self.known_ranks:
+            with open(event_output_files[rank], "w") as event_output:
+                json.dump(events_per_rank[rank], event_output, indent=indent)
+            with open(unique_events_output_files[rank], "w") as unique_events_output:
+                json.dump(sorted(list((self.rank_unique_events_dict[rank].values())), key=lambda e : e["depth"]), unique_events_output, indent=indent)
+        with open(unique_events_output_file, "w") as unique_events_output_all:
+            json.dump(sorted(list((self.unique_events_dict.values())), key=lambda e: e["depth"]), unique_events_output_all, indent=indent)
+        with open(metadata_output_file, "w") as metadata_output:
+            json.dump(metadata_result, metadata_output, indent=indent)
+
         self.written += len(self.records) + len(self.samples)
 
     def sync_timestamps(self):
@@ -414,7 +432,7 @@ class CaliTraceEventConverter:
             self.unique_functions.append(name)
 
         if ftn_id not in self.unique_events_dict:
-            self.unique_events_dict[ftn_id] = trec
+            self.unique_events_dict[ftn_id] = trec.copy()
             self.unique_events_dict[ftn_id]["count"] = 1
             self.unique_events_dict[ftn_id]["rank_info"] = {rank: {"count": 1, "dur": dur}}
             del self.unique_events_dict[ftn_id]["rank"]
@@ -428,7 +446,17 @@ class CaliTraceEventConverter:
                 self.unique_events_dict[ftn_id]["rank_info"][rank]["count"] += 1
                 self.unique_events_dict[ftn_id]["rank_info"][rank]["dur"] += dur
 
+        if rank not in self.rank_unique_events_dict:
+            self.rank_unique_events_dict[rank] = {}
 
+        if ftn_id not in self.rank_unique_events_dict[rank]:
+            self.rank_unique_events_dict[rank][ftn_id] = trec.copy()
+            self.rank_unique_events_dict[rank][ftn_id]["count"] = 1
+            del self.rank_unique_events_dict[rank][ftn_id]["rank"]
+            del self.rank_unique_events_dict[rank][ftn_id]["eid"]
+        else:
+            self.rank_unique_events_dict[rank][ftn_id]["dur"] += dur
+            self.rank_unique_events_dict[rank][ftn_id]["count"] += 1
 
     def _process_cupti_activity_rec(self, rec, trec):
         cat  = rec["cupti.activity.kind"]
@@ -484,14 +512,7 @@ class CaliTraceEventConverter:
 
 def convert_cali_to_json(input_files: list, files_dir: str):
 
-    event_output_file = os.path.join(files_dir, "events.json")
-    metadata_output_file = os.path.join(files_dir, "metadata.json")
-    unique_events_output_file = os.path.join(files_dir, "unique_events.json")
-
     cfg = {
-        "event_output": open(event_output_file, "w"),
-        "metadata_output": open(metadata_output_file, "w"),
-        "unique_events_output": open(unique_events_output_file, "w"),
         "pretty_print": True,
         "sync_timestamps": True,
         "counters": {},
@@ -514,11 +535,8 @@ def convert_cali_to_json(input_files: list, files_dir: str):
         converter.end_timing(ts)
 
     ts = converter.start_timing("Writing ...")
-    converter.write(cfg["event_output"], cfg["metadata_output"], cfg["unique_events_output"])
+    converter.write(files_dir)
     converter.end_timing(ts)
-
-    cfg["event_output"].close()
-    cfg["metadata_output"].close()
 
     end = time.perf_counter()
     tot = end - begin

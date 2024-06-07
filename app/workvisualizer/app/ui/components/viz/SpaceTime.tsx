@@ -1,22 +1,23 @@
-'use client'
-import React, { useEffect, useRef } from 'react';
-import { useTheme } from "next-themes";
+import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { VisualizationProps } from '@/app/types'
-
-export const dataRequirements = {
-    endpoint: '/api/spacetime', // API endpoint for this component's data
-    params: {} // Additional parameters if needed
-};
+import { CheckboxGroup, Checkbox } from '@nextui-org/react';
+import { VisualizationProps } from '@/app/types';
 
 const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
     const ref = useRef();
+    const [visibleTypes, setVisibleTypes] = useState(["collective", "mpi", "kokkos", "other"]);
+    const [filteredData, setFilteredData] = useState(data);
+
+    // Update filteredData when visibleTypes change
+    useEffect(() => {
+        const filtered = data.filter(d => visibleTypes.includes(d.type));
+        setFilteredData(filtered);
+    }, [data, visibleTypes]);
 
     useEffect(() => {
         const svg = d3.select(ref.current);
         svg.selectAll("*").remove();
 
-        // Specify the chart’s dimensions.
         const width = 928;
         const height = 600;
         const marginTop = 25;
@@ -24,10 +25,9 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
         const marginBottom = 35;
         const marginLeft = 40;
 
-        // Define color scale for different types
         const colorScale = d3.scaleOrdinal()
             .domain(["collective", "mpi", "kokkos", "other"])
-            .range(["#1f77b4","#ff7f0e","#2ca02c", "#a783c9"]);
+            .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#a783c9"]);
 
         // Define brush for zooming
         var brush = d3.brush()
@@ -35,47 +35,21 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .on("start", disableTooltips)
             .on("end", updateChart);
 
-        // Sort unique keys by path length
-        const sortedData = data.sort((a, b) => a.depth - b.depth);
+        const x = d3.scaleLinear()
+            .domain(d3.extent(filteredData, d => d.ts))
+            .range([marginLeft, width - marginRight]);
+
+        const sortedData = filteredData.sort((a, b) => a.depth - b.depth);
         const uniqueKeys = Array.from(new Set(sortedData.map(d => d.ftn_id)));
         const keyIndexMap = new Map(uniqueKeys.map((key, index) => [key, index]));
-
-        // Prepare the scales for positional encoding.
-        const x = d3.scaleLinear()
-            .domain(d3.extent(data, d => d.ts))
-            .range([marginLeft, width - marginRight]);
 
         const y = d3.scaleLinear()
             .domain([0, uniqueKeys.length - 1])
             .range([marginTop, height - marginBottom]);
 
-        // Create the SVG container.
         svg.attr("viewBox", [0, 0, width, height])
            .attr("style", "max-width: 100%; height: auto; font: 10px sans-serif;");
 
-        // try this in the future: https://stackoverflow.com/questions/35652760/styling-d3%C2%B4s-tooltip
-
-        // Wrap the SVG with a container that has the html element above it
-        // const container = html`<div>
-        // <style>.tooltip {
-        //     font: sans-serif 12pt;
-        //     background: #eeeeeeee;
-        //     pointer-events: none;
-        //     border-radius: 2px;
-        //     padding: 5px;
-        //     position: absolute;
-        //     top: 0px;
-        //     left: 0px;
-        //     z-index: 1;
-
-        // }</style>
-
-        // <div class="tooltip"></div>
-        // ${svg.node()}
-
-        // </div>`
-
-        // Create the axes.
         var xAxis = svg.append("g")
             .attr("transform", `translate(0,${height - marginBottom})`)
             .call(d3.axisBottom(x).ticks(width / 80))
@@ -97,27 +71,6 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 .attr("text-anchor", "center")
                 .attr("transform", "rotate(-90)")
                 .text("<-- Depth in the Path <--"));
-
-        // Create the grid.
-        // svg.append("g")
-        //   .attr("stroke", "currentColor")
-        //   .attr("stroke-opacity", 0.1)
-        //   .call(g => g.append("g")
-        //     .selectAll("line")
-        //     .data(x.ticks())
-        //     .join("line")
-        //       .attr("x1", d => 0.5 + x(d))
-        //       .attr("x2", d => 0.5 + x(d))
-        //       .attr("y1", marginTop)
-        //       .attr("y2", height - marginBottom))
-        //   .call(g => g.append("g")
-        //     .selectAll("line")
-        //     .data(y.ticks())
-        //     .join("line")
-        //       .attr("y1", d => 0.5 + y(d))
-        //       .attr("y2", d => 0.5 + y(d))
-        //       .attr("x1", marginLeft)
-        //       .attr("x2", width - marginRight));
 
         // Add brushing
         svg.append("g")
@@ -186,12 +139,30 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             // tooltip.style("opacity", 0);
         }
 
-        // Add a layer of dots
+        // Draw horizontal lines for depth levels
+        svg.selectAll(".depth-line")
+            .data(Array.from(new Set(sortedData.map(d => d.depth))))
+            .enter().append("line")
+            .attr("class", "depth-line")
+            .attr("x1", marginLeft)
+            .attr("x2", width - marginRight)
+            .attr("y1", d => {
+                const firstInDepth = sortedData.find(item => item.depth === d);
+                return y(keyIndexMap.get(firstInDepth.ftn_id));
+            })
+            .attr("y2", d => {
+                const firstInDepth = sortedData.find(item => item.depth === d);
+                return y(keyIndexMap.get(firstInDepth.ftn_id));
+            })
+            .attr("stroke", "currentColor")
+            .attr("stroke-opacity", 0.3)
+            .attr("stroke-width", 2);
+
         svg.append("g")
             .attr("stroke-width", 1.5)
             .selectAll("circle")
-            .data(data)
-            .join("circle")
+            .data(filteredData)
+            .enter().append("circle")
             .attr("cx", d => x(d.ts))
             .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
             .attr("r", 3)
@@ -209,7 +180,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .style("font-weight", "bold");
 
         // A function that set idleTimeOut to null
-        var idleTimeout
+        var idleTimeout;
         function idled() { idleTimeout = null; }
 
         // Stack to keep track of zoom states
@@ -252,6 +223,17 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                     // Re-enable mouse events after transition ends
                     d3.select(this).style("pointer-events", "all");
                 });
+            // Update depth lines
+            svg.selectAll(".depth-line")
+                .transition().duration(750)
+                .attr("y1", d => {
+                    const firstInDepth = sortedData.find(item => item.depth === d);
+                    return y(keyIndexMap.get(firstInDepth.ftn_id));
+                })
+                .attr("y2", d => {
+                    const firstInDepth = sortedData.find(item => item.depth === d);
+                    return y(keyIndexMap.get(firstInDepth.ftn_id));
+                });
         }
 
         svg.on("dblclick", () => {
@@ -284,51 +266,28 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             svg.selectAll("circle").style("pointer-events", "all");
         }
 
-        //////////////////////////////////////////////////////////
-        //////                    LEGEND                    //////
-        //////////////////////////////////////////////////////////
+    }, [filteredData]);
 
-        // Create a legend
-        const legend = svg.append("g")
-            .attr("class", "legend")
-            .attr("transform", `translate(${marginLeft}, 20)`); // Adjust the position of the legend
-
-        // Add legend items
-        const legendItems = legend.selectAll(".legend-item")
-            .data(colorScale.domain())
-            .enter().append("g")
-            .attr("class", "legend-item")
-            .attr("transform", (d, i) => `translate(0, ${i * 20})`);
-
-        // Add colored rectangles
-        legendItems.append("rect")
-            .attr("x", 0)
-            .attr("width", 10)
-            .attr("height", 10)
-            .attr("fill", colorScale);
-
-        // Add text labels
-        const label_text = legendItems.append("text")
-            .attr("x", 15)
-            .attr("y", 5)
-            .attr("dy", "0.75em")
-            .attr("fill", "currentColor")
-            .style("font-size", "10px")
-            .text(d => d);
-
-        // Add a background rectangle for the legend
-        legend.insert("rect", ":first-child")
-            .attr("x", -5)
-            .attr("y", -5)
-            .attr("width", 110)
-            .attr("height", colorScale.domain().length * 20 + 10)
-            .attr("fill", "white")
-            .attr("opacity", 0.3)
-            .attr("stroke", "none");
-    }, [data]);
+    const handleCheckboxChange = (values) => {
+        setVisibleTypes(values);
+    };
 
     return (
-        <svg ref={ref} width={928} height={600} />
+        <div>
+            <CheckboxGroup
+                size="sm"
+                orientation="horizontal"
+                color="primary"
+                defaultValue={visibleTypes}
+                onChange={handleCheckboxChange}
+            >
+                <Checkbox color="primary" value="collective">MPI Collective</Checkbox>
+                <Checkbox color="warning" value="mpi">MPI Point-To-Point</Checkbox>
+                <Checkbox color="success" value="kokkos">Kokkos</Checkbox>
+                <Checkbox color="secondary" value="other">Application</Checkbox>
+            </CheckboxGroup>
+            <svg ref={ref} width={928} height={600} />
+        </div>
     );
 };
 
