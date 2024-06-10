@@ -27,7 +27,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
 
         const colorScale = d3.scaleOrdinal()
             .domain(["collective", "mpi", "kokkos", "other"])
-            .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#a783c9"]);
+            .range(["#1f77b4", "#f5a524", "#2ca02c", "#a783c9"]);
 
         // Define brush for zooming
         var brush = d3.brush()
@@ -90,7 +90,6 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
         var mouseenter = function(event, d) {
 
             // Enlarge the selected data point and outline in white
-            d3.select(this).raise();
             d3.select(this).transition()
                 .duration('50')
                 .attr("r", 6)
@@ -127,7 +126,6 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
         // Define a function for when the mouse leaves a data point
         var mouseleave = function (d, i) {
 
-            d3.select(this).lower();
             // Shrink the data point back to its original size and remove the outline
             d3.select(this).transition()
                 .duration('100')

@@ -17,82 +17,50 @@ interface Plot {
     }
 }
 
-const known_ranks = [0,1,2] // TODO: read in "known.ranks" from metadata.json
-const depths = [            // TODO: read in "known.depths" from metadata.json
-    {key: "0", label: "0"},
-    {key: "1", label: "1"},
-    {key: "2", label: "2"},
-]
+let known_ranks = [0]
+let known_depths = [1]
+let maximum_depth = 1
 
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
-    const [selectedRank, setSelectedRank] = useState<number | null>(null);
-    const [selectedDepth, setSelectedDepth] = useState<number | null>(null);
+    const [selectedRank, setSelectedRank] = useState<number | 0>(0);
+    const [selectedDepth, setSelectedDepth] = useState<number | 5>(5);
     const [isIndentedTreeSelected, setIsIndentedTreeSelected] = useState(false);
     const [plotData, setPlotData] = useState<any>({});
     const [plots, setPlots] = useState<Plot[]>([
         // API formatting: /api/{component}/({root})/{depth}/{rank}
         //   Defaults:
         //      root (only for hierarchies): -1 (shows entire available tree)
-        //      depth:                       10 (only parses records with path depth < 10)
+        //      depth:                        5 (only parses records with path depth < 5)
         //      rank:                         0 (default to rank 0)
-        { key: 'globalIndentedTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1/10/0' } },
-        { key: 'logicalSunBurst', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1/10/0'} },
-        { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime/10/0'} },
-        { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/10/0' } },
-    ]);
+        { key: 'globalIndentedTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1/5/0' } },
+        { key: 'logicalSunBurst', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1/5/0'} },
+        { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime/5/0'} },
+        { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/0' } },
+        ]);
 
     const handleRankChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        console.log("handling RankChange")
-        const rank = parseInt(event.target.value, 10);
+        const rank = parseInt(event.target.value, 5);
         setSelectedRank(rank);
-        updateAllEndpointsRanks(rank);
-    };
-
-    const updateAllEndpointsRanks = (selection: number) => {
-        console.log("updating all ranks")
-        console.log(plots)
-        console.log(selection)
-        setPlots(plots.map(plot => {
-            const previousEndpoint = plot.plot.endpoint.split("/").slice(0, -1).join("/");
-            console.log(previousEndpoint);
-            console.log(`${previousEndpoint}/${selection}`);
-            return {
-                ...plot,
-                plot: {
-                    ...plot.plot,
-                    endpoint: `${previousEndpoint}/${selection}`
-                }
-            };
-        }));
-        console.log(plots)
+        updateAllEndpoints(selectedDepth, rank);
     };
 
     const handleMaxDepthChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const depth = parseInt(event.target.value, 10);
+        const initial_depth = parseInt(event.target.value, 5);
+        const depth =  (initial_depth >= maximum_depth && 5 >= maximum_depth) ? 5 : initial_depth;
         setSelectedDepth(depth);
-        updateAllEndpointsDepths(depth);
+        updateAllEndpoints(depth, selectedRank);
     };
 
-    const updateAllEndpointsDepths = (selection: number) => {
-        console.log(plots)
-        console.log(selection)
+    const updateAllEndpoints = (depth: number, rank: number) => {
         setPlots(plots.map(plot => {
             const previousSplits = plot.plot.endpoint.split("/");
-            console.log(previousSplits)
-            const currentRank = previousSplits[-1]
-            console.log("currentRank:")
-            console.log(currentRank)
             const previousEndpoint = previousSplits.slice(0,-2).join("/");
-            console.log("previousEndpoint:")
-            console.log(previousEndpoint);
-            console.log("new endpoint:")
-            console.log(`${previousEndpoint}/${selection}/${currentRank}`);
             return {
                 ...plot,
                 plot: {
                     ...plot.plot,
-                    endpoint: `${previousEndpoint}/${selection}/${currentRank}`
+                    endpoint: `${previousEndpoint}/${depth}/${rank}`
                 }
             };
         }));
@@ -111,9 +79,12 @@ export default function Page() {
                 dataMap[res.key] = res.data;
             });
             setPlotData(dataMap);
+            known_ranks = dataMap['summaryTable']['known.ranks'].sort()
+            known_depths = dataMap['summaryTable']['known.depths'].sort()
+            maximum_depth = dataMap['summaryTable']['maximum.depth']
         }
         fetchData();
-    }, [plots, selectedRank, selectedDepth]);
+    }, [plots]);
 
     return (
         <div className='h-screen '>
@@ -132,7 +103,6 @@ export default function Page() {
                         variant="bordered"
                         placeholder="Select plots"
                         selectedKeys={selectedPlot}
-                        defaultSelectedKeys={['logicalSunBurst']}
                         onSelectionChange={(keys) => setSelectedPlot(Array.from(keys))}
                         className="min-w-full pt-4"
                     >
@@ -156,10 +126,10 @@ export default function Page() {
                     <Spacer x={2}/>
                     <div className="overflow-auto">
                         <RadioGroup
-                            label="Select Rank"
+                            label="Select rank"
                             orientation="horizontal"
-                            defaultValue={known_ranks[0].toString()}
-                            onChange={handleRankChange} // Ensure you handle the change event
+                            defaultValue={selectedRank}
+                            onChange={handleRankChange}
                         >
                             {known_ranks.map(rank => (
                                 <Radio key={rank.toString()} value={rank}>
@@ -169,13 +139,15 @@ export default function Page() {
                         </RadioGroup>
                         <Spacer y={5}/>
                         <Select
+                            disallowEmptySelection
                             label="Select maximum depth"
                             className="max-w-xs"
+                            defaultValue={selectedDepth}
                             onChange={handleMaxDepthChange}
                         >
-                            {depths.map((depth) => (
-                            <SelectItem key={depth.key}>
-                                {depth.label}
+                            {known_depths.map((depth) => (
+                            <SelectItem key={depth.toString()} value={depth.toString()}>
+                                {depth}
                             </SelectItem>
                             ))}
                         </Select>

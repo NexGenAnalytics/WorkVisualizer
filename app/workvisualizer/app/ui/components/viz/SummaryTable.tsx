@@ -88,7 +88,7 @@ export default function SummaryTable({ data }) {
                 <TableRow key={index}>
                   <TableCell>{callTypeLabels[type]}</TableCell>
                   <TableCell>{data["total.counts"]["average"][type]}</TableCell>
-                  <TableCell>{data["unique.counts"]["average"][type]}</TableCell>
+                  <TableCell>{data["unique.counts"]["global"][type]}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

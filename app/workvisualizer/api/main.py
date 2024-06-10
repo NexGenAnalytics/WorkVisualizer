@@ -78,7 +78,7 @@ async def upload_cali_files(files: list[UploadFile] = File(...)):
         finally:
             await file.close()
 
-    unpack_cali(maximum_depth_limit=10)
+    unpack_cali(maximum_depth_limit=5)
 
     return {"message": "Successfully uploaded files."}
 

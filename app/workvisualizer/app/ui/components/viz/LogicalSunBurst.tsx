@@ -24,7 +24,7 @@ const GlobalSunBurst = ({ data }) => {
         // Create the color scale.
         const colorScale = d3.scaleOrdinal()
             .domain(["collective", "mpi", "kokkos", "other"])
-            .range(["#1f77b4", "#ff7f0e", "#2ca02c", "#a783c9"]);
+            .range(["#1f77b4", "#f5a524", "#2ca02c", "#a783c9"]);
 
         // Filter data to include only nodes with visible types
         const filterData = (node) => {

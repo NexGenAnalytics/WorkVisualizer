@@ -161,7 +161,7 @@ class CaliTraceEventConverter:
         'pthread.id',
     ]
 
-    def __init__(self, cfg, maximum_depth_limit=None):
+    def __init__(self, cfg, maximum_depth_limit=5):
         self.cfg     = cfg
 
         self.records = []
@@ -185,11 +185,14 @@ class CaliTraceEventConverter:
         self.maximum_depth_limit = maximum_depth_limit
 
         # These keep track of metadata
+        # TODO: there must be a cleaner way to do this
         self.event_id_iterator = 0
-        self.event_counters = {}
+        self.rank_event_counters = {}
+        self.unique_event_counters = {}
         self.unique_functions = []
         self.known_ftns = []
         self.known_ranks = []
+        self.known_depths = []
         self.rank_unique_events_dict = {}
         self.unique_events_dict = {}
         self.max_depth = 0
@@ -242,30 +245,31 @@ class CaliTraceEventConverter:
         biggest_events = sorted(list(self.unique_events_dict.values()), key=lambda event : event["dur"], reverse=True)[:10]
         metadata_result = self.reader.globals
         metadata_result["known.ranks"] = self.known_ranks
-        metadata_result["known.depths"] = list(range(self.max_depth))
+        metadata_result["known.depths"] = self.known_depths
+        metadata_result["maximum.depth"] = max(self.known_depths)
         metadata_result["unique.counts"] = {}
         metadata_result["total.counts"] = {}
         agg_counts = {"total_count": {}, "unique_count": {}, "time": {}}
         for rank in self.known_ranks:
-            metadata_result["unique.counts"][f"rank.{rank}"] = {"kokkos": self.event_counters[rank]["kokkos"]["unique_count"],
-                                                                "mpi_p2p": self.event_counters[rank]["mpi"]["unique_count"],
-                                                                "mpi_collective": self.event_counters[rank]["collective"]["unique_count"],
-                                                                "other": self.event_counters[rank]["other"]["unique_count"]}
-            metadata_result["total.counts"][f"rank.{rank}"] = {"kokkos": self.event_counters[rank]["kokkos"]["total_count"],
-                                                               "mpi_p2p": self.event_counters[rank]["mpi"]["total_count"],
-                                                               "mpi_collective": self.event_counters[rank]["collective"]["total_count"],
-                                                               "other": self.event_counters[rank]["other"]["total_count"]}
-            for call_type in self.event_counters[rank].keys():
-                for key, val in self.event_counters[rank][call_type].items():
+            metadata_result["unique.counts"][f"rank.{rank}"] = {"kokkos": self.rank_event_counters[rank]["kokkos"]["unique_count"],
+                                                                "mpi_p2p": self.rank_event_counters[rank]["mpi"]["unique_count"],
+                                                                "mpi_collective": self.rank_event_counters[rank]["collective"]["unique_count"],
+                                                                "other": self.rank_event_counters[rank]["other"]["unique_count"]}
+            metadata_result["total.counts"][f"rank.{rank}"] = {"kokkos": self.rank_event_counters[rank]["kokkos"]["total_count"],
+                                                               "mpi_p2p": self.rank_event_counters[rank]["mpi"]["total_count"],
+                                                               "mpi_collective": self.rank_event_counters[rank]["collective"]["total_count"],
+                                                               "other": self.rank_event_counters[rank]["other"]["total_count"]}
+            for call_type in self.rank_event_counters[rank].keys():
+                for key, val in self.rank_event_counters[rank][call_type].items():
                     if call_type not in agg_counts[key]:
                         agg_counts[key][call_type] = val
                     else:
                         agg_counts[key][call_type] += val
 
-        avg_unique_counts = {"average": {key: val/len(self.known_ranks) for key, val in agg_counts["unique_count"].items()}}
+        # avg_unique_counts = {"average": {key: val/len(self.known_ranks) for key, val in agg_counts["unique_count"].items()}}
         avg_total_counts = {"average": {key: val/len(self.known_ranks) for key, val in agg_counts["total_count"].items()}}
 
-        metadata_result["unique.counts"].update(avg_unique_counts)
+        metadata_result["unique.counts"].update({"global": self.unique_event_counters})
         metadata_result["total.counts"].update(avg_total_counts)
         program_runtime = events_result[-1]["ts"] + events_result[-1]["dur"] - events_result[0]["ts"]
         metadata_result["program.runtime"] = program_runtime
@@ -313,11 +317,15 @@ class CaliTraceEventConverter:
     def filter_rec(self, key, rec):
         keys = list(rec.keys())
         kernel_type_filter = "kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]
-        depth_filter = self.maximum_depth_limit is not None and (
-                            (key.startswith("event.begin#") and "path" in keys and len(rec.get("path", [])) > int(self.maximum_depth_limit)) or \
-                            (key.startswith("event.end#") and "path" in keys and len(rec.get("path", [])) - 1 > int(self.maximum_depth_limit))
-                        )
-        return kernel_type_filter and depth_filter
+        depth_filter = key.startswith("event.begin#") and len(rec.get("path", [])) >= int(self.maximum_depth_limit) or \
+                       key.startswith("event.end#") and len(rec.get("path", [])) - 1 >= int(self.maximum_depth_limit)
+
+        if key.startswith("event.begin#"):
+            depth = len(rec.get("path", []))
+            if depth not in self.known_depths and depth > 0:
+                self.known_depths.append(depth)
+
+        return kernel_type_filter or depth_filter
 
     def _process_record(self, rec):
         pid  = int(_get_first_from_list(rec, self.pid_attributes))
@@ -413,7 +421,7 @@ class CaliTraceEventConverter:
         rank = int(rec.get("mpi.rank"))
         if rank not in self.known_ranks:
             self.known_ranks.append(rank)
-            self.event_counters[rank] = counts_template_dict
+            self.rank_event_counters[rank] = counts_template_dict
 
         skey = (loc,attr)
 
@@ -441,15 +449,19 @@ class CaliTraceEventConverter:
         else:
             type = "other"
 
-        self.event_counters[rank][type]["time"] += (tst-btst)
-        self.event_counters[rank][type]["total_count"] += 1
+        self.rank_event_counters[rank][type]["time"] += (tst-btst)
+        self.rank_event_counters[rank][type]["total_count"] += 1
 
         # Removed from trec: {ph="X", cat=attr}
         trec.update(name=name, eid=eid, ftn_id=ftn_id, depth=depth, type=type, ts=btst, dur=dur, path=path, kernel_type=kernel_type, rank=rank)
 
         if name not in self.unique_functions:
-            self.event_counters[rank][type]["unique_count"] += 1
+            self.rank_event_counters[rank][type]["unique_count"] += 1
             self.unique_functions.append(name)
+            if type not in self.unique_event_counters:
+                self.unique_event_counters[type] = 1
+            else:
+                self.unique_event_counters[type] += 1
 
         if ftn_id not in self.unique_events_dict:
             self.unique_events_dict[ftn_id] = trec.copy()
@@ -530,7 +542,7 @@ class CaliTraceEventConverter:
             trec.update(sf=sf)
 
 
-def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit: int = None):
+def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit: int = 5):
 
     cfg = {
         "pretty_print": True,
