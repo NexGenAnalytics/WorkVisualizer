@@ -17,38 +17,82 @@ interface Plot {
     }
 }
 
-var known_ranks = [0, 1, 2, 3];
+const known_ranks = [0,1,2] // TODO: read in "known.ranks" from metadata.json
+const depths = [            // TODO: read in "known.depths" from metadata.json
+    {key: "0", label: "0"},
+    {key: "1", label: "1"},
+    {key: "2", label: "2"},
+]
 
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
     const [selectedRank, setSelectedRank] = useState<number | null>(null);
+    const [selectedDepth, setSelectedDepth] = useState<number | null>(null);
     const [isIndentedTreeSelected, setIsIndentedTreeSelected] = useState(false);
     const [plotData, setPlotData] = useState<any>({});
     const [plots, setPlots] = useState<Plot[]>([
-        { key: 'globalIndentedTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1/0' } },
-        { key: 'logicalSunBurst', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1/0'} },
-        { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime/0'} },
-        { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/0' } },
+        // API formatting: /api/{component}/({root})/{depth}/{rank}
+        //   Defaults:
+        //      root (only for hierarchies): -1 (shows entire available tree)
+        //      depth:                       10 (only parses records with path depth < 10)
+        //      rank:                         0 (default to rank 0)
+        { key: 'globalIndentedTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1/10/0' } },
+        { key: 'logicalSunBurst', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1/10/0'} },
+        { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime/10/0'} },
+        { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/10/0' } },
     ]);
 
-    const handleRadioChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleRankChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        console.log("handling RankChange")
         const rank = parseInt(event.target.value, 10);
         setSelectedRank(rank);
-        updateAllEndpoints(rank);
+        updateAllEndpointsRanks(rank);
     };
 
-    const updateAllEndpoints = (selection: number) => {
+    const updateAllEndpointsRanks = (selection: number) => {
+        console.log("updating all ranks")
         console.log(plots)
         console.log(selection)
         setPlots(plots.map(plot => {
-            const previousEndpoint = plot.plot.endpoint.split("/").slice(0, -1);
+            const previousEndpoint = plot.plot.endpoint.split("/").slice(0, -1).join("/");
             console.log(previousEndpoint);
-            console.log(`${previousEndpoint.join("/")}/${selection}`);
+            console.log(`${previousEndpoint}/${selection}`);
             return {
                 ...plot,
                 plot: {
                     ...plot.plot,
-                    endpoint: `${previousEndpoint.join("/")}/${selection}`
+                    endpoint: `${previousEndpoint}/${selection}`
+                }
+            };
+        }));
+        console.log(plots)
+    };
+
+    const handleMaxDepthChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const depth = parseInt(event.target.value, 10);
+        setSelectedDepth(depth);
+        updateAllEndpointsDepths(depth);
+    };
+
+    const updateAllEndpointsDepths = (selection: number) => {
+        console.log(plots)
+        console.log(selection)
+        setPlots(plots.map(plot => {
+            const previousSplits = plot.plot.endpoint.split("/");
+            console.log(previousSplits)
+            const currentRank = previousSplits[-1]
+            console.log("currentRank:")
+            console.log(currentRank)
+            const previousEndpoint = previousSplits.slice(0,-2).join("/");
+            console.log("previousEndpoint:")
+            console.log(previousEndpoint);
+            console.log("new endpoint:")
+            console.log(`${previousEndpoint}/${selection}/${currentRank}`);
+            return {
+                ...plot,
+                plot: {
+                    ...plot.plot,
+                    endpoint: `${previousEndpoint}/${selection}/${currentRank}`
                 }
             };
         }));
@@ -69,7 +113,7 @@ export default function Page() {
             setPlotData(dataMap);
         }
         fetchData();
-    }, [plots, selectedRank]);
+    }, [plots, selectedRank, selectedDepth]);
 
     return (
         <div className='h-screen '>
@@ -115,7 +159,7 @@ export default function Page() {
                             label="Select Rank"
                             orientation="horizontal"
                             defaultValue={known_ranks[0].toString()}
-                            onChange={handleRadioChange} // Ensure you handle the change event
+                            onChange={handleRankChange} // Ensure you handle the change event
                         >
                             {known_ranks.map(rank => (
                                 <Radio key={rank.toString()} value={rank}>
@@ -123,6 +167,18 @@ export default function Page() {
                                 </Radio>
                             ))}
                         </RadioGroup>
+                        <Spacer y={5}/>
+                        <Select
+                            label="Select maximum depth"
+                            className="max-w-xs"
+                            onChange={handleMaxDepthChange}
+                        >
+                            {depths.map((depth) => (
+                            <SelectItem key={depth.key}>
+                                {depth.label}
+                            </SelectItem>
+                            ))}
+                        </Select>
                         <Spacer y={5}/>
                         {selectedPlot.map((key) => {
                             const PlotComponent = {

@@ -161,7 +161,7 @@ class CaliTraceEventConverter:
         'pthread.id',
     ]
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, maximum_depth_limit=None):
         self.cfg     = cfg
 
         self.records = []
@@ -181,6 +181,9 @@ class CaliTraceEventConverter:
         self.skipped = 0
         self.written = 0
 
+        # Filtering data
+        self.maximum_depth_limit = maximum_depth_limit
+
         # These keep track of metadata
         self.event_id_iterator = 0
         self.event_counters = {}
@@ -189,6 +192,7 @@ class CaliTraceEventConverter:
         self.known_ranks = []
         self.rank_unique_events_dict = {}
         self.unique_events_dict = {}
+        self.max_depth = 0
 
     def read(self, filename_or_stream):
         self.reader.read(filename_or_stream, self._process_record)
@@ -217,15 +221,17 @@ class CaliTraceEventConverter:
 
     def write(self, files_dir):
 
-        event_output_files = {rank: os.path.join(files_dir, f"events-{rank}.json") for rank in self.known_ranks}
-        unique_events_output_files = {rank: os.path.join(files_dir, f"unique-events-{rank}.json") for rank in self.known_ranks}
-        metadata_output_file = os.path.join(files_dir, "metadata.json")
-        unique_events_output_file = os.path.join(files_dir, "unique-events-all.json")
+        depth_desc = "depth_full" if self.maximum_depth_limit is None else f"depth_{self.maximum_depth_limit}"
 
-        if len(self.stackframes.nodes) > 0:
-            result["stackFrames"] = self.stackframes.get_stackframes()
-        if len(self.samples) > 0:
-            result["samples"] = self.samples
+        event_output_files = {rank: os.path.join(files_dir, "events", f"events-{rank}-{depth_desc}.json") for rank in self.known_ranks}
+        unique_events_output_files = {rank: os.path.join(files_dir, "unique-events", f"unique-events-{rank}-{depth_desc}.json") for rank in self.known_ranks}
+        metadata_output_file = os.path.join(files_dir, "metadata", f"metadata-{depth_desc}.json")
+        unique_events_output_file = os.path.join(files_dir, "unique-events", f"unique-events-all-{depth_desc}.json")
+
+        # if len(self.stackframes.nodes) > 0:
+        #     result["stackFrames"] = self.stackframes.get_stackframes()
+        # if len(self.samples) > 0:
+        #     result["samples"] = self.samples
 
         events_result = sorted(self.records, key=lambda event : event["ts"])
         # Separate into rank specific lists
@@ -235,6 +241,8 @@ class CaliTraceEventConverter:
         # TODO: look in every rank for biggest events (not just 0)
         biggest_events = sorted(list(self.unique_events_dict.values()), key=lambda event : event["dur"], reverse=True)[:10]
         metadata_result = self.reader.globals
+        metadata_result["known.ranks"] = self.known_ranks
+        metadata_result["known.depths"] = list(range(self.max_depth))
         metadata_result["unique.counts"] = {}
         metadata_result["total.counts"] = {}
         agg_counts = {"total_count": {}, "unique_count": {}, "time": {}}
@@ -302,6 +310,15 @@ class CaliTraceEventConverter:
         if self.cfg["verbose"]:
             print(f" done ({tot:.2f}s).", file=sys.stderr)
 
+    def filter_rec(self, key, rec):
+        keys = list(rec.keys())
+        kernel_type_filter = "kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]
+        depth_filter = self.maximum_depth_limit is not None and (
+                            (key.startswith("event.begin#") and "path" in keys and len(rec.get("path", [])) > int(self.maximum_depth_limit)) or \
+                            (key.startswith("event.end#") and "path" in keys and len(rec.get("path", [])) - 1 > int(self.maximum_depth_limit))
+                        )
+        return kernel_type_filter and depth_filter
+
     def _process_record(self, rec):
         pid  = int(_get_first_from_list(rec, self.pid_attributes))
         tid  = int(_get_first_from_list(rec, self.tid_attributes))
@@ -330,7 +347,7 @@ class CaliTraceEventConverter:
         else:
             keys = list(rec.keys())
             for key in keys:
-                if "kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]:
+                if self.filter_rec(key, rec):
                     continue
                 if key.startswith("event.begin#"):
                     self._process_event_begin_rec(rec, (pid, tid), key)
@@ -389,6 +406,9 @@ class CaliTraceEventConverter:
             ftn_id = self.known_ftns.index(identifier)
 
         depth = len(raw_path)
+
+        if depth > self.max_depth:
+            self.max_depth = depth
 
         rank = int(rec.get("mpi.rank"))
         if rank not in self.known_ranks:
@@ -510,7 +530,7 @@ class CaliTraceEventConverter:
             trec.update(sf=sf)
 
 
-def convert_cali_to_json(input_files: list, files_dir: str):
+def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit: int = None):
 
     cfg = {
         "pretty_print": True,
@@ -521,7 +541,7 @@ def convert_cali_to_json(input_files: list, files_dir: str):
         "verbose": False
     }
 
-    converter = CaliTraceEventConverter(cfg)
+    converter = CaliTraceEventConverter(cfg, maximum_depth_limit)
 
     begin = time.perf_counter()
 

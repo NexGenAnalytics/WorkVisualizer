@@ -40,7 +40,7 @@ export default function SummaryTable({ data }) {
   return (
     <div className="flex flex-col gap-3">
 
-      <Accordion>
+      <Accordion selectionMode="multiple">
 
         <AccordionItem key="1" aria-label="Program Information" title="Program Information">
           <Table
@@ -56,10 +56,14 @@ export default function SummaryTable({ data }) {
             </TableHeader>
             <TableBody>
               <TableRow key="1">
-                <TableCell>Number of Ranks</TableCell>
+                <TableCell>Comm Size</TableCell>
                 <TableCell>{data["mpi.world.size"]}</TableCell>
               </TableRow>
               <TableRow key="2">
+                <TableCell>Received Ranks</TableCell>
+                <TableCell>{data["known.ranks"].join(", ")}</TableCell>
+              </TableRow>
+              <TableRow key="3">
                 <TableCell>Program Runtime</TableCell>
                 <TableCell>{formatTime(data["program.runtime"])} s</TableCell>
               </TableRow>

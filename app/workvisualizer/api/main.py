@@ -34,101 +34,135 @@ def get_data_from_json(filepath):
         sys.exit(f"Could not find {filepath}")
 
 def remove_existing_files(directory):
-    for filename in os.listdir(directory):
-        filepath = os.path.join(directory, filename)
-        if os.path.isfile(filepath):
-            os.remove(filepath)
+    for item in os.listdir(directory):
+        full_path = os.path.join(directory, item)
+        if os.path.isfile(full_path):
+            os.remove(full_path)
+        elif os.path.isdir(full_path):
+            remove_existing_files(full_path)
 
-def unpack_cali():
-    input_files = [os.path.join(files_dir, filename) for filename in os.listdir(files_dir) if filename.endswith(".cali")]
+def unpack_cali(maximum_depth_limit=None):
+    cali_dir = os.path.join(files_dir, "cali")
+
+    events_dir = os.path.join(files_dir, "events")
+    os.makedirs(events_dir, exist_ok=True)
+
+    unique_dir = os.path.join(files_dir, "unique-events")
+    os.makedirs(unique_dir, exist_ok=True)
+
+    metadata_dir = os.path.join(files_dir, "metadata")
+    os.makedirs(metadata_dir, exist_ok=True)
+
+    input_files = [os.path.join(cali_dir, filename) for filename in os.listdir(cali_dir) if filename.endswith(".cali")]
+
     if len(input_files) == 0:
         return {"message": "No input .cali file was found."}
-    convert_cali_to_json(input_files, files_dir)
+
+    convert_cali_to_json(input_files, files_dir, maximum_depth_limit)
 
 @app.post("/api/upload")
 async def upload_cali_files(files: list[UploadFile] = File(...)):
     os.makedirs(files_dir, exist_ok=True)
     remove_existing_files(files_dir)
+
+    cali_dir = os.path.join(files_dir, "cali")
+    os.makedirs(cali_dir, exist_ok=True)
+
     for file in files:
         try:
             contents = await file.read()
-            with open(f"{files_dir}/{file.filename}", "wb") as f:
+            with open(f"{cali_dir}/{file.filename}", "wb") as f:
                 f.write(contents)
         except Exception as e:
             return {"message": f"There was an error uploading {file.filename}: {e}"}
         finally:
             await file.close()
 
-    # Then get the initial data
-    unpack_cali()
+    unpack_cali(maximum_depth_limit=10)
 
     return {"message": "Successfully uploaded files."}
 
-# This endpoint doesn't use the RANK at all for now
-@app.get("/api/metadata/{rank}")
-def get_metadata(rank):
-    filename = "metadata.json"
-    filepath = os.path.join(files_dir, filename)
+# This endpoint doesn't use the rank at all for now
+@app.get("/api/metadata/{depth}/{rank}")
+def get_metadata(depth, rank):
+    print("called get metadata")
+    metadata_dir = os.path.join(files_dir, "metadata")
+
+    depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
+    filename = f"metadata-{depth_desc}.json"
+    filepath = os.path.join(metadata_dir, filename)
 
     if not os.path.isfile(filepath):
-        unpack_cali()
+        unpack_cali(maximum_depth_limit=depth)
 
     return get_data_from_json(filepath)
 
-@app.get("/api/spacetime/{rank}")
-def get_spacetime_data(rank):
-    filename = f"events-{rank}.json"
-    filepath = os.path.join(files_dir, filename)
+@app.get("/api/spacetime/{depth}/{rank}")
+def get_spacetime_data(depth, rank):
+    events_dir = os.path.join(files_dir, "events")
+
+    depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
+    filename = f"events-{rank}-{depth_desc}.json"
+    filepath = os.path.join(events_dir, filename)
+
+    print(filepath)
 
     if not os.path.isfile(filepath):
-        unpack_cali()
+        unpack_cali(maximum_depth_limit=depth)
 
-    if not os.path.isfile(filepath):
-        # TODO: Add error that rank wasn't found
-        pass
+    # TODO: Add check for rank
 
     return get_data_from_json(filepath)
 
-@app.get("/api/hierarchy/{rank}")
-def get_hierarchy_data(rank):
-    filename = f"hierarchy-{rank}.json"
-    filepath = os.path.join(files_dir, filename)
+# @app.get("/api/hierarchy/{rank}")
+# def get_hierarchy_data(rank):
+#     filename = f"hierarchy-{rank}.json"
+#     filepath = os.path.join(files_dir, filename)
 
-    events_file = os.path.join(files_dir, f"events-{rank}.json")
+#     events_file = os.path.join(files_dir, f"events-{rank}.json")
 
-    if not os.path.isfile(filepath):
-        if not os.path.isfile(events_file):
-            unpack_cali()
-        events_to_hierarchy(events_file, filepath)
+#     if not os.path.isfile(filepath):
+#         if not os.path.isfile(events_file):
+#             unpack_cali()
+#         events_to_hierarchy(events_file, filepath)
 
-    return get_data_from_json(filepath)
+#     return get_data_from_json(filepath)
 
-@app.get("/api/logical_hierarchy/{ftn_id}/{rank}")
-def get_logical_hierarchy_data(ftn_id, rank):
-    depth_desc = "full" if ftn_id == "-1" else ftn_id
+@app.get("/api/logical_hierarchy/{ftn_id}/{depth}/{rank}")
+def get_logical_hierarchy_data(ftn_id, depth, rank):
+    print(f"get_logical_hierarchy received: ftn_id {ftn_id}, depth {depth}, rank {rank}")
+
+    unique_dir = os.path.join(files_dir, "unique-events")
+
+    logical_dir = os.path.join(files_dir, "logical_hierarchy")
+    os.makedirs(logical_dir, exist_ok=True)
+
+    root_desc = "root" if ftn_id == "-1" else f"root_{ftn_id}"
+    depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
     rank_desc = "all" if rank == "-1" else rank
-    filename = f"logical_hierarchy_rank_{rank_desc}_depth_{depth_desc}.json"
-    filepath = os.path.join(files_dir, filename)
+    filename = f"logical_hierarchy_rank_{rank_desc}_root_{root_desc}_{depth_desc}.json"
+    filepath = os.path.join(logical_dir, filename)
 
-    unique_events_file = os.path.join(files_dir, f"unique-events-{rank_desc}.json")
+    unique_events_file = os.path.join(unique_dir, f"unique-events-{rank_desc}-{depth_desc}.json")
     print(unique_events_file)
     if not os.path.isfile(filepath):
         if not os.path.isfile(unique_events_file):
-            unpack_cali()
-        if not os.path.isfile(unique_events_file):
-            # TODO: throw an error for missing rank
-            pass
+            unpack_cali(maximum_depth_limit=depth)
+
+        # TODO: Add check for rank
         generate_logical_hierarchy_from_root(unique_events_file, os.path.join(filepath), ftn_id=int(ftn_id))
+
     return get_data_from_json(filepath)
 
 @app.get("/api/util/vizcomponents")
 def get_available_viz_componenents():
-    directory_path = os.path.join(os.getcwd(), '..', 'app', 'ui', 'components', 'viz')
+    viz_components_dir = os.path.join(os.getcwd(), '..', 'app', 'ui', 'components', 'viz')
 
     try:
-        files = os.listdir(directory_path)
+        files = os.listdir(viz_components_dir)
         tsx_files = [file for file in files if file.endswith('.tsx')]
         print(tsx_files)
         return JSONResponse(content={"components": tsx_files})
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
