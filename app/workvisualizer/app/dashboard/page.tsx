@@ -1,6 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react';
 import NavBar from "@/app/ui/components/NavBar";
+import {Tabs, Tab, Card, CardBody} from "@nextui-org/react";
 import { Divider, Spacer } from "@nextui-org/react";
 import { Select, SelectItem, Checkbox } from "@nextui-org/react";
 import { RadioGroup, Radio } from "@nextui-org/react";
@@ -90,7 +91,7 @@ export default function Page() {
         <div className='h-screen '>
             <NavBar/>
             <div className='flex flex-row h-screen'>
-                <div className="flex flex-col p-4 min-w-fit h-screen">
+                <div className="flex flex-col p-4 h-screen" style={{ minWidth: '425px', maxWidth: '525px' }}>
                     <Checkbox
                         className="min-w-full"
                         isSelected={isIndentedTreeSelected}
@@ -102,7 +103,6 @@ export default function Page() {
                         label="Select Plots"
                         variant="bordered"
                         placeholder="Select plots"
-                        selectedKeys={selectedPlot}
                         onSelectionChange={(keys) => setSelectedPlot(Array.from(keys))}
                         className="min-w-full pt-4"
                     >
@@ -113,8 +113,47 @@ export default function Page() {
                     <Spacer y={5}/>
                     <Divider orientation='horizontal'/>
                     <Spacer y={2}/>
-                    {plotData['summaryTable'] ? <SummaryTable data={plotData['summaryTable']} /> : null}
-                    {/*<p className="text-xs">{JSON.stringify(plotData['summaryTable'])}</p>*/}
+                    <Tabs aria-label="options">
+                        <Tab key="summary" title="Summary">
+                            <Card>
+                                {plotData['summaryTable'] ? <SummaryTable data={plotData['summaryTable']} /> : null}
+                            </Card>
+                        </Tab>
+                        <Tab key="setting" title="Settings">
+                            <Card>
+                                <Spacer y={5} />
+                                <RadioGroup
+                                    label="Select rank"
+                                    orientation="horizontal"
+                                    defaultValue={selectedRank}
+                                    onChange={handleRankChange}
+                                    style={{ marginLeft: '15px' }}
+                                >
+                                    {known_ranks.map(rank => (
+                                        <Radio key={rank.toString()} value={rank}>
+                                            {rank}
+                                        </Radio>
+                                    ))}
+                                </RadioGroup>
+                                <Spacer y={5}/>
+                                <Select
+                                    style={{ marginLeft: '15px' }}
+                                    disallowEmptySelection
+                                    label="Select maximum depth"
+                                    className="max-w-xs"
+                                    defaultValue={selectedDepth}
+                                    onChange={handleMaxDepthChange}
+                                >
+                                    {known_depths.map((depth) => (
+                                    <SelectItem key={depth.toString()} value={depth.toString()}>
+                                        {depth}
+                                    </SelectItem>
+                                    ))}
+                                </Select>
+                                <Spacer y={5}/>
+                            </Card>
+                        </Tab>
+                    </Tabs>
                 </div>
                 <Divider orientation='vertical'/>
                 <div className="flex flex-row p-4 bg-slate-950">
@@ -125,32 +164,6 @@ export default function Page() {
                     {isIndentedTreeSelected && plotData['globalIndentedTree'] ? <Divider orientation='vertical' /> : null}
                     <Spacer x={2}/>
                     <div className="overflow-auto">
-                        <RadioGroup
-                            label="Select rank"
-                            orientation="horizontal"
-                            defaultValue={selectedRank}
-                            onChange={handleRankChange}
-                        >
-                            {known_ranks.map(rank => (
-                                <Radio key={rank.toString()} value={rank}>
-                                    {rank}
-                                </Radio>
-                            ))}
-                        </RadioGroup>
-                        <Spacer y={5}/>
-                        <Select
-                            disallowEmptySelection
-                            label="Select maximum depth"
-                            className="max-w-xs"
-                            defaultValue={selectedDepth}
-                            onChange={handleMaxDepthChange}
-                        >
-                            {known_depths.map((depth) => (
-                            <SelectItem key={depth.toString()} value={depth.toString()}>
-                                {depth}
-                            </SelectItem>
-                            ))}
-                        </Select>
                         <Spacer y={5}/>
                         {selectedPlot.map((key) => {
                             const PlotComponent = {

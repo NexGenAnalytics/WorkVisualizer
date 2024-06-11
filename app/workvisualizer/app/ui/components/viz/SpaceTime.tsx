@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { CheckboxGroup, Checkbox } from '@nextui-org/react';
+import { CheckboxGroup, Checkbox, Switch, Spacer } from '@nextui-org/react';
 import { VisualizationProps } from '@/app/types';
 
 const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
     const ref = useRef();
     const [visibleTypes, setVisibleTypes] = useState(["collective", "mpi", "kokkos", "other"]);
     const [filteredData, setFilteredData] = useState(data);
+    const [showDuration, setShowDuration] = useState(false);
 
     // Update filteredData when visibleTypes change
     useEffect(() => {
@@ -30,7 +31,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .range(["#1f77b4", "#f5a524", "#2ca02c", "#a783c9"]);
 
         // Define brush for zooming
-        var brush = d3.brush()
+        let brush = d3.brush()
             .extent([ [0,0], [width, height] ])
             .on("start", disableTooltips)
             .on("end", updateChart);
@@ -50,7 +51,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
         svg.attr("viewBox", [0, 0, width, height])
            .attr("style", "max-width: 100%; height: auto; font: 10px sans-serif;");
 
-        var xAxis = svg.append("g")
+        let xAxis = svg.append("g")
             .attr("transform", `translate(0,${height - marginBottom})`)
             .call(d3.axisBottom(x).ticks(width / 80))
             .call(g => g.select(".domain"))
@@ -61,7 +62,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 .attr("text-anchor", "center")
                 .text("Function Begin Time (s)"));
 
-        var yAxis = svg.append("g")
+        let yAxis = svg.append("g")
             .call(d3.axisLeft(y).tickValues([]))
             .call(g => g.select(".domain").remove())
             .call(g => g.append("text")
@@ -87,20 +88,59 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
         }
 
         // Define a function for what happens when mousing over a data point
-        var mouseenter = function(event, d) {
+        let mouseenter = function(event, d) {
 
-            // Enlarge the selected data point and outline in white
-            d3.select(this).transition()
-                .duration('50')
-                .attr("r", 6)
-                .attr("stroke", "white");
+            // Highlight parent functions
+            let parents = d.path.split('/');
+            console.log("Debugging")
+            console.log(d.name)
+            console.log(parents)
+            parents.forEach(parent => {
+                const parentEvents = filteredData.filter(e => e.name == parent && e.ts <= d.ts && e.ts + e.dur >= d.ts);
+                console.log(parentEvents)
+                if (showDuration) {
+                    svg.selectAll("rect")
+                        .filter(e => parentEvents.includes(e))
+                        .transition().duration(50)
+                        .attr("stroke", "white")
+                        .attr("rx", 6)
+                        .attr("ry", 6)
+                        .attr("x", e => x(e.ts) - 3)
+                        .attr("y", e => y(keyIndexMap.get(e.ftn_id)) - 6)
+                        .attr("height", 12)
+                        .attr("width", e => x(e.ts + e.dur) - x(e.ts) < 12 ? 12 : x(e.ts + e.dur) - x(e.ts) + 6);
+                } else {
+                    svg.selectAll("circle")
+                        .filter(e => parentEvents.includes(e))
+                        .transition().duration(50)
+                        .attr("r", 6)
+                        .attr("stroke", "white");
+                }
+                });
+
+            if (showDuration) {
+                d3.select(this).transition()
+                    .duration('50')
+                    .attr("stroke", "white")
+                    .attr("rx", 6)
+                    .attr("ry", 6)
+                    .attr("x", d => x(d.ts) - 3)
+                    .attr("y", d => y(keyIndexMap.get(d.ftn_id)) - 6)
+                    .attr("height", 12)
+                    .attr("width", d => x(d.ts + d.dur) - x(d.ts) < 12 ? 12 : x(d.ts + d.dur) - x(d.ts) + 6);
+            } else {
+                d3.select(this).transition()
+                    .duration('50')
+                    .attr("r", 6)
+                    .attr("stroke", "white");
+            }
 
             // Define the text in the tooltip
-            var tooltip_text = `${d.name}\n
-            Start: ${formatTime(d.ts)} s\n
-            End: ${formatTime(d.ts + d.dur)} s\n
-            Duration: ${formatTime(d.dur)} s\n
-            Rank: ${d.rank}`;
+            let tooltip_text = `${d.name}\n
+                Start: ${formatTime(d.ts)} s\n
+                End: ${formatTime(d.ts + d.dur)} s\n
+                Duration: ${formatTime(d.dur)} s\n
+                Rank: ${d.rank}`;
             if ("src" in d) {
                 tooltip_text += `\nSource: ${d.src}`;
             }
@@ -124,17 +164,28 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
         }
 
         // Define a function for when the mouse leaves a data point
-        var mouseleave = function (d, i) {
+        let mouseleave = function (d, i) {
 
             // Shrink the data point back to its original size and remove the outline
-            d3.select(this).transition()
-                .duration('100')
-                .attr("r", 3)
-                .attr("stroke", "none");
+            if (showDuration) {
+                d3.selectAll("rect").transition()
+                    .duration('100')
+                    .attr("stroke", "none")
+                    .attr("rx", 3)
+                    .attr("ry", 3)
+                    .attr("x", d => x(d.ts))
+                    .attr("y", d => y(keyIndexMap.get(d.ftn_id)) - 3)
+                    .attr("height", 6)
+                    .attr("width", d => x(d.ts + d.dur) - x(d.ts) < 6 ? 6 : x(d.ts + d.dur) - x(d.ts));
+            } else {
+                d3.selectAll("circle").transition()
+                    .duration('100')
+                    .attr("r", 3)
+                    .attr("stroke", "none");
+            }
 
             // Make the tooltip invisible
             tooltip.text("")
-            // tooltip.style("opacity", 0);
         }
 
         // Draw horizontal lines for depth levels
@@ -156,17 +207,35 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .attr("stroke-opacity", 0.3)
             .attr("stroke-width", 2);
 
-        svg.append("g")
-            .attr("stroke-width", 1.5)
-            .selectAll("circle")
-            .data(filteredData)
-            .enter().append("circle")
-            .attr("cx", d => x(d.ts))
-            .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
-            .attr("r", 3)
-            .attr("fill", d => colorScale(d.type))
-            .on('mouseenter', mouseenter)
-            .on('mouseleave', mouseleave);
+        if (showDuration) {
+            svg.append("g")
+                .attr("stroke-width", 1.5)
+                .selectAll("rect")
+                .data(filteredData)
+                .enter().append("rect")
+                .attr("rx", 3)
+                .attr("ry", 3)
+                .attr("x", d => x(d.ts))
+                .attr("y", d => y(keyIndexMap.get(d.ftn_id)) - 3)
+                .attr("width", d => x(d.ts + d.dur) - x(d.ts) < 6 ? 6 : x(d.ts + d.dur) - x(d.ts))
+                .attr("height", 6)
+                .attr("fill", d => colorScale(d.type))
+                .on('mouseenter', mouseenter)
+                .on('mouseleave', mouseleave);
+        } else {
+            svg.append("g")
+                .attr("stroke-width", 1.5)
+                .selectAll("circle")
+                .data(filteredData)
+                .enter().append("circle")
+                .attr("cx", d => x(d.ts))
+                .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
+                .attr("r", 3)
+                .attr("fill", d => colorScale(d.type))
+                .on('mouseenter', mouseenter)
+                .on('mouseleave', mouseleave);
+        }
+
 
         // Try a different tooltip technique
         const tooltip = svg
@@ -178,16 +247,14 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .style("font-weight", "bold");
 
         // A function that set idleTimeOut to null
-        var idleTimeout;
+        let idleTimeout;
         function idled() { idleTimeout = null; }
 
         // Stack to keep track of zoom states
-        var zoomStack = [];
+        let zoomStack = [];
 
         // A function that update the chart for given boundaries
         function updateChart({selection}) {
-
-            disableTooltips;
 
             // If no selection, back to initial coordinate. Otherwise, update X and Y domains
             if (!selection) {
@@ -210,17 +277,41 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 svg.select(".brush").call(brush.move, null)
             }
 
-            // Update axis and circle position
+            // Update axis and data point position
             xAxis.transition().duration(750).call(d3.axisBottom(x).ticks(width / 80));
             yAxis.transition().duration(750).call(d3.axisLeft(y)).call(g => g.select(".domain").remove());
-            svg.selectAll("circle")
-                .transition().duration(750)
-                .attr("cx", d => x(d.ts))
-                .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
-                .on("end", function() {
-                    // Re-enable mouse events after transition ends
-                    d3.select(this).style("pointer-events", "all");
-                });
+
+            // svg.selectAll("circle")
+            //     .transition().duration(750)
+            //     .attr("cx", d => x(d.ts))
+            //     .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
+            //     .on("end", function() {
+            //         // Re-enable mouse events after transition ends
+            //         d3.select(this).style("pointer-events", "all");
+            //     });
+
+
+            if (showDuration) {
+                svg.selectAll("rect")
+                    .transition().duration(750)
+                    .attr("x", d => x(d.ts))
+                    .attr("y", d => y(keyIndexMap.get(d.ftn_id)) - 3)
+                    .attr("width", d => x(d.ts + d.dur) - x(d.ts) < 6 ? 6 : x(d.ts + d.dur) - x(d.ts))
+                    .on("end", function() {
+                        // Re-enable mouse events after transition ends
+                        d3.select(this).style("pointer-events", "all");
+                    });
+            } else {
+                svg.selectAll("circle")
+                    .transition().duration(750)
+                    .attr("cx", d => x(d.ts))
+                    .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
+                    .on("end", function() {
+                        // Re-enable mouse events after transition ends
+                        d3.select(this).style("pointer-events", "all");
+                    });
+            }
+
             // Update depth lines
             svg.selectAll(".depth-line")
                 .transition().duration(750)
@@ -243,31 +334,58 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
 
                 xAxis.transition().duration(750).call(d3.axisBottom(x).ticks(width / 80));
                 yAxis.transition().duration(750).call(d3.axisLeft(y)).call(g => g.select(".domain").remove());
-                svg.selectAll("circle")
+
+                if (showDuration) {
+                    svg.selectAll("rect")
+                        .transition().duration(750)
+                        .attr("x", d => x(d.ts))
+                        .attr("y", d => y(keyIndexMap.get(d.ftn_id)) - 3)
+                        .attr("width", d => x(d.ts + d.dur) - x(d.ts) < 6 ? 6 : x(d.ts + d.dur) - x(d.ts))
+                        .on("end", function() {
+                            d3.select(this).style("pointer-events", "all");
+                        });
+                } else {
+                    svg.selectAll("circle")
+                        .transition().duration(750)
+                        .attr("cx", d => x(d.ts))
+                        .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
+                        .on("end", function() {
+                            d3.select(this).style("pointer-events", "all");
+                        });
+                }
+
+                // Update depth lines
+                svg.selectAll(".depth-line")
                     .transition().duration(750)
-                    .attr("cx", d => x(d.ts))
-                    .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
-                    .on("end", function() {
-                        d3.select(this).style("pointer-events", "all");
+                    .attr("y1", d => {
+                        const firstInDepth = sortedData.find(item => item.depth === d);
+                        return y(keyIndexMap.get(firstInDepth.ftn_id));
+                    })
+                    .attr("y2", d => {
+                        const firstInDepth = sortedData.find(item => item.depth === d);
+                        return y(keyIndexMap.get(firstInDepth.ftn_id));
                     });
             }
-            enableTooltips;
+            // enableTooltips;
         });
 
         // Simple function to disable tooltips during transitions
         function disableTooltips() {
-            svg.selectAll("circle").style("pointer-events", "none");
+            if (showDuration) {
+                svg.selectAll("rect").style("pointer-events", "none");
+            } else {
+                svg.selectAll("circle").style("pointer-events", "none");
+            }
         }
 
-        // Simple function to enable tooltips during transitions
-        function enableTooltips() {
-            svg.selectAll("circle").style("pointer-events", "all");
-        }
-
-    }, [filteredData]);
+    }, [filteredData, showDuration]);
 
     const handleCheckboxChange = (values) => {
         setVisibleTypes(values);
+    };
+
+    const handleToggleChange = () => {
+        setShowDuration(prevState => !prevState);
     };
 
     return (
@@ -284,6 +402,15 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 <Checkbox color="success" value="kokkos">Kokkos</Checkbox>
                 <Checkbox color="secondary" value="other">Application</Checkbox>
             </CheckboxGroup>
+            <Spacer y={5} />
+            <Switch
+                checked={showDuration}
+                onChange={handleToggleChange}
+                size="sm"
+                color="primary"
+            >
+                Show Duration
+            </Switch>
             <svg ref={ref} width={928} height={600} />
         </div>
     );

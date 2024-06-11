@@ -1,11 +1,12 @@
-import Image from 'next/image';
+import { useTheme } from "next-themes";
+import dynamic from 'next/dynamic';
+
+const Image = dynamic(() => import('next/image'), { ssr: false });
 import ngaDark from "../../../../public/nga-dark.svg";
 import ngaLight from "../../../../public/nga-light.svg";
-import {useTheme} from "next-themes";
-
 
 const Logo = () => {
-    const {theme, setTheme} = useTheme()
+    const { theme } = useTheme();
 
     return (
         <div>
@@ -17,7 +18,7 @@ const Logo = () => {
                 className="hidden md:block"
             />
         </div>
-    )
+    );
 };
 
 export default Logo;

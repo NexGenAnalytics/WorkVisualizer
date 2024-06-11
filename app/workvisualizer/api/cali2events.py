@@ -225,7 +225,6 @@ class CaliTraceEventConverter:
     def write(self, files_dir):
 
         depth_desc = "depth_full" if self.maximum_depth_limit is None else f"depth_{self.maximum_depth_limit}"
-
         event_output_files = {rank: os.path.join(files_dir, "events", f"events-{rank}-{depth_desc}.json") for rank in self.known_ranks}
         unique_events_output_files = {rank: os.path.join(files_dir, "unique-events", f"unique-events-{rank}-{depth_desc}.json") for rank in self.known_ranks}
         metadata_output_file = os.path.join(files_dir, "metadata", f"metadata-{depth_desc}.json")
@@ -313,6 +312,17 @@ class CaliTraceEventConverter:
 
         if self.cfg["verbose"]:
             print(f" done ({tot:.2f}s).", file=sys.stderr)
+
+    def _get_type(self, function_name):
+        if "MPI_" in function_name:
+            if function_name in all_collectives:
+                return "collective"
+            else:
+                return "mpi"
+        elif "Kokkos::" in function_name:
+            return "kokkos"
+        else:
+            return "other"
 
     def filter_rec(self, key, rec):
         keys = list(rec.keys())
@@ -439,15 +449,7 @@ class CaliTraceEventConverter:
 
         self._get_stackframe(rec, trec)
 
-        if "MPI_" in name:
-            if name in all_collectives:
-                type = "collective"
-            else:
-                type = "mpi"
-        elif "Kokkos::" in name:
-            type = "kokkos"
-        else:
-            type = "other"
+        type = self._get_type(name)
 
         self.rank_event_counters[rank][type]["time"] += (tst-btst)
         self.rank_event_counters[rank][type]["total_count"] += 1

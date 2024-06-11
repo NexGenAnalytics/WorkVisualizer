@@ -40,11 +40,12 @@ export default function SummaryTable({ data }) {
   return (
     <div className="flex flex-col gap-3">
 
-      <Accordion selectionMode="multiple">
+      <Accordion selectionMode="multiple" defaultExpandedKeys={["1"]}>
 
         <AccordionItem key="1" aria-label="Program Information" title="Program Information">
           <Table
             hideHeader
+            removeWrapper
             color={selectedColor}
             selectionMode="single"
             defaultSelectedKeys={[]}
@@ -73,6 +74,7 @@ export default function SummaryTable({ data }) {
 
         <AccordionItem key="2" aria-label="Call Distribution" title="Call Distribution (averaged across ranks)">
           <Table
+            removeWrapper
             color={selectedColor}
             selectionMode="single"
             defaultSelectedKeys={[]}
@@ -96,6 +98,7 @@ export default function SummaryTable({ data }) {
         </AccordionItem>
         <AccordionItem key="3" aria-label="Largest calls" title="Largest Calls (averaged across ranks)">
           <Table
+            removeWrapper
             color={selectedColor}
             selectionMode="single"
             defaultSelectedKeys={[]}
