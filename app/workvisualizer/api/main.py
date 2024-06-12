@@ -85,7 +85,6 @@ async def upload_cali_files(files: list[UploadFile] = File(...)):
 # This endpoint doesn't use the rank at all for now
 @app.get("/api/metadata/{depth}/{rank}")
 def get_metadata(depth, rank):
-    print("called get metadata")
     metadata_dir = os.path.join(files_dir, "metadata")
 
     depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
@@ -100,12 +99,24 @@ def get_metadata(depth, rank):
 @app.get("/api/spacetime/{depth}/{rank}")
 def get_spacetime_data(depth, rank):
     events_dir = os.path.join(files_dir, "events")
-
     depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
+
+    if rank == "all":
+        all_rank_data = []
+        at_least_one_file = False
+        for file in os.listdir(events_dir):
+            if file.endswith(f"{depth_desc}.json"):
+                at_least_one_file = True
+                all_rank_data.extend(get_data_from_json(os.path.join(events_dir, file)))
+
+        if not at_least_one_file:
+            unpack_cali(maximum_depth_limit=depth)
+            at_least_one_file = True
+
+        return all_rank_data
+
     filename = f"events-{rank}-{depth_desc}.json"
     filepath = os.path.join(events_dir, filename)
-
-    print(filepath)
 
     if not os.path.isfile(filepath):
         unpack_cali(maximum_depth_limit=depth)
@@ -130,8 +141,6 @@ def get_spacetime_data(depth, rank):
 
 @app.get("/api/logical_hierarchy/{ftn_id}/{depth}/{rank}")
 def get_logical_hierarchy_data(ftn_id, depth, rank):
-    print(f"get_logical_hierarchy received: ftn_id {ftn_id}, depth {depth}, rank {rank}")
-
     unique_dir = os.path.join(files_dir, "unique-events")
 
     logical_dir = os.path.join(files_dir, "logical_hierarchy")
@@ -139,11 +148,10 @@ def get_logical_hierarchy_data(ftn_id, depth, rank):
 
     root_desc = "root" if ftn_id == "-1" else f"root_{ftn_id}"
     depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
-    rank_desc = "all" if rank == "-1" else rank
-    filename = f"logical_hierarchy_rank_{rank_desc}_root_{root_desc}_{depth_desc}.json"
+    filename = f"logical_hierarchy_rank_{rank}_root_{root_desc}_{depth_desc}.json"
     filepath = os.path.join(logical_dir, filename)
 
-    unique_events_file = os.path.join(unique_dir, f"unique-events-{rank_desc}-{depth_desc}.json")
+    unique_events_file = os.path.join(unique_dir, f"unique-events-{rank}-{depth_desc}.json")
     print(unique_events_file)
     if not os.path.isfile(filepath):
         if not os.path.isfile(unique_events_file):

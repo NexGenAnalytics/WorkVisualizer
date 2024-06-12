@@ -24,7 +24,7 @@ let maximum_depth = 1
 
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
-    const [selectedRank, setSelectedRank] = useState<number | 0>(0);
+    const [selectedRank, setSelectedRank] = useState<string | "0">("0");
     const [selectedDepth, setSelectedDepth] = useState<number | 5>(5);
     const [isIndentedTreeSelected, setIsIndentedTreeSelected] = useState(false);
     const [plotData, setPlotData] = useState<any>({});
@@ -41,7 +41,7 @@ export default function Page() {
         ]);
 
     const handleRankChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const rank = parseInt(event.target.value, 10);
+        const rank = event.target.value;
         setSelectedRank(rank);
         updateAllEndpoints(selectedDepth, rank);
     };
@@ -53,7 +53,7 @@ export default function Page() {
         updateAllEndpoints(depth, selectedRank);
     };
 
-    const updateAllEndpoints = (depth: number, rank: number) => {
+    const updateAllEndpoints = (depth: number, rank: string) => {
         setPlots(plots.map(plot => {
             const previousSplits = plot.plot.endpoint.split("/");
             const previousEndpoint = previousSplits.slice(0,-2).join("/");
@@ -130,10 +130,13 @@ export default function Page() {
                                     style={{ marginLeft: '15px' }}
                                 >
                                     {known_ranks.map(rank => (
-                                        <Radio key={rank.toString()} value={rank}>
-                                            {rank}
+                                        <Radio key={rank.toString()} value={rank.toString()}>
+                                            {rank.toString()}
                                         </Radio>
                                     ))}
+                                    <Radio key="all" value="all">
+                                        All
+                                    </Radio>
                                 </RadioGroup>
                                 <Spacer y={5}/>
                                 <Select
