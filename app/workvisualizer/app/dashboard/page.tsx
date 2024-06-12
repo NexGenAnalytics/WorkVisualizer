@@ -41,13 +41,13 @@ export default function Page() {
         ]);
 
     const handleRankChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const rank = parseInt(event.target.value, 5);
+        const rank = parseInt(event.target.value, 10);
         setSelectedRank(rank);
         updateAllEndpoints(selectedDepth, rank);
     };
 
     const handleMaxDepthChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const initial_depth = parseInt(event.target.value, 5);
+        const initial_depth = parseInt(event.target.value, 10);
         const depth =  (initial_depth >= maximum_depth && 5 >= maximum_depth) ? 5 : initial_depth;
         setSelectedDepth(depth);
         updateAllEndpoints(depth, selectedRank);
@@ -140,13 +140,14 @@ export default function Page() {
                                     style={{ marginLeft: '15px' }}
                                     disallowEmptySelection
                                     label="Select maximum depth"
+                                    placeholder={selectedDepth > maximum_depth ? maximum_depth.toString() : selectedDepth.toString()}
                                     className="max-w-xs"
                                     defaultValue={selectedDepth}
                                     onChange={handleMaxDepthChange}
                                 >
                                     {known_depths.map((depth) => (
                                     <SelectItem key={depth.toString()} value={depth.toString()}>
-                                        {depth}
+                                        {depth.toString()}
                                     </SelectItem>
                                     ))}
                                 </Select>

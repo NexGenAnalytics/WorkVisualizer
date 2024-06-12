@@ -73,11 +73,6 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 .attr("transform", "rotate(-90)")
                 .text("<-- Depth in the Path <--"));
 
-        // Add brushing
-        svg.append("g")
-            .attr("class", "brush")
-            .call(brush);
-
         // Define a function to format the begin, end, and duration times
         function formatTime(time) {
             if (time < 0.0001) {
@@ -92,12 +87,8 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
 
             // Highlight parent functions
             let parents = d.path.split('/');
-            console.log("Debugging")
-            console.log(d.name)
-            console.log(parents)
             parents.forEach(parent => {
                 const parentEvents = filteredData.filter(e => e.name == parent && e.ts <= d.ts && e.ts + e.dur >= d.ts);
-                console.log(parentEvents)
                 if (showDuration) {
                     svg.selectAll("rect")
                         .filter(e => parentEvents.includes(e))
@@ -120,45 +111,42 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
 
             if (showDuration) {
                 d3.select(this).transition()
-                    .duration('50')
+                    .duration(50)
                     .attr("stroke", "white")
                     .attr("rx", 6)
                     .attr("ry", 6)
                     .attr("x", d => x(d.ts) - 3)
-                    .attr("y", d => y(keyIndexMap.get(d.ftn_id)) - 6)
+                    .attr("y", d => y(Number(keyIndexMap.get(d.ftn_id))) - 6)
                     .attr("height", 12)
                     .attr("width", d => x(d.ts + d.dur) - x(d.ts) < 12 ? 12 : x(d.ts + d.dur) - x(d.ts) + 6);
             } else {
                 d3.select(this).transition()
-                    .duration('50')
+                    .duration(50)
                     .attr("r", 6)
                     .attr("stroke", "white");
             }
 
             // Define the text in the tooltip
-            let tooltip_text = `${d.name}\n
-                Start: ${formatTime(d.ts)} s\n
-                End: ${formatTime(d.ts + d.dur)} s\n
-                Duration: ${formatTime(d.dur)} s\n
-                Rank: ${d.rank}`;
+            let tooltip_text = `${d.name}\nStart: ${formatTime(d.ts)} s\nEnd: ${formatTime(d.ts + d.dur)} s\nDuration: ${formatTime(d.dur)} s\nRank: ${d.rank}`;
             if ("src" in d) {
                 tooltip_text += `\nSource: ${d.src}`;
             }
             if ("dst" in d) {
                 tooltip_text += `\nDestination: ${d.dst}`;
             }
-            if (d.depth > 0) {
+            if (d.path != "") {
                 tooltip_text += `\nPath: ${d.path}`;
             }
             const [mx, my] = d3.pointer(event);
-            const lineHeight = 10;
+            const lineHeight = 17;
             const y_pos = my < (marginBottom + height) / 2 ? 10 : -80;
             tooltip
                 .attr("transform", `translate(${mx}, ${my})`)
                 .selectAll("tspan")
                 .data(tooltip_text.split("\n"))
                 .join("tspan")
-                .attr("x", mx < (marginLeft + width)/2 ? "20px" : "-250px")
+                .attr("text-anchor", mx < (marginLeft + width)/2 ? "begin" : "end")
+                .attr("x", mx < (marginLeft + width)/2 ? "20px" : "-20px")
                 .attr("y", (d, i) => y_pos + i * lineHeight)
                 .text((text) => text );
         }
@@ -168,18 +156,20 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
 
             // Shrink the data point back to its original size and remove the outline
             if (showDuration) {
-                d3.selectAll("rect").transition()
-                    .duration('100')
+                svg.selectAll("rect").transition()
+                // d3.select(this).transition()     // switch the commented line (with above) to allow brushing after mouseleave
+                    .duration(100)
                     .attr("stroke", "none")
                     .attr("rx", 3)
                     .attr("ry", 3)
                     .attr("x", d => x(d.ts))
-                    .attr("y", d => y(keyIndexMap.get(d.ftn_id)) - 3)
+                    .attr("y", d => y(Number(keyIndexMap.get(d.ftn_id))) - 3)
                     .attr("height", 6)
                     .attr("width", d => x(d.ts + d.dur) - x(d.ts) < 6 ? 6 : x(d.ts + d.dur) - x(d.ts));
             } else {
-                d3.selectAll("circle").transition()
-                    .duration('100')
+                svg.selectAll("circle").transition()
+                // d3.select(this).transition()    // switch the commented line (with above) to allow brushing after mouseleave
+                    .duration(100)
                     .attr("r", 3)
                     .attr("stroke", "none");
             }
@@ -187,6 +177,11 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             // Make the tooltip invisible
             tooltip.text("")
         }
+
+        // Add brushing
+        svg.append("g")
+            .attr("class", "brush")
+            .call(brush);
 
         // Draw horizontal lines for depth levels
         svg.selectAll(".depth-line")
@@ -197,11 +192,11 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
             .attr("x2", width - marginRight)
             .attr("y1", d => {
                 const firstInDepth = sortedData.find(item => item.depth === d);
-                return y(keyIndexMap.get(firstInDepth.ftn_id));
+                return y(Number(keyIndexMap.get(firstInDepth.ftn_id)));
             })
             .attr("y2", d => {
                 const firstInDepth = sortedData.find(item => item.depth === d);
-                return y(keyIndexMap.get(firstInDepth.ftn_id));
+                return y(Number(keyIndexMap.get(firstInDepth.ftn_id)));
             })
             .attr("stroke", "currentColor")
             .attr("stroke-opacity", 0.3)
@@ -216,7 +211,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 .attr("rx", 3)
                 .attr("ry", 3)
                 .attr("x", d => x(d.ts))
-                .attr("y", d => y(keyIndexMap.get(d.ftn_id)) - 3)
+                .attr("y", d => y(Number(keyIndexMap.get(d.ftn_id))) - 3)
                 .attr("width", d => x(d.ts + d.dur) - x(d.ts) < 6 ? 6 : x(d.ts + d.dur) - x(d.ts))
                 .attr("height", 6)
                 .attr("fill", d => colorScale(d.type))
@@ -229,7 +224,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 .data(filteredData)
                 .enter().append("circle")
                 .attr("cx", d => x(d.ts))
-                .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
+                .attr("cy", d => y(Number(keyIndexMap.get(d.ftn_id))))
                 .attr("r", 3)
                 .attr("fill", d => colorScale(d.type))
                 .on('mouseenter', mouseenter)
@@ -254,7 +249,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
         let zoomStack = [];
 
         // A function that update the chart for given boundaries
-        function updateChart({selection}) {
+        function updateChart({ selection }) {
 
             // If no selection, back to initial coordinate. Otherwise, update X and Y domains
             if (!selection) {
@@ -277,26 +272,17 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 svg.select(".brush").call(brush.move, null)
             }
 
-            // Update axis and data point position
+            // Update axis
             xAxis.transition().duration(750).call(d3.axisBottom(x).ticks(width / 80));
             yAxis.transition().duration(750).call(d3.axisLeft(y)).call(g => g.select(".domain").remove());
 
-            // svg.selectAll("circle")
-            //     .transition().duration(750)
-            //     .attr("cx", d => x(d.ts))
-            //     .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
-            //     .on("end", function() {
-            //         // Re-enable mouse events after transition ends
-            //         d3.select(this).style("pointer-events", "all");
-            //     });
-
-
+            // Update data point positioning (and width, if showDuration == True)
             if (showDuration) {
                 svg.selectAll("rect")
                     .transition().duration(750)
                     .attr("x", d => x(d.ts))
-                    .attr("y", d => y(keyIndexMap.get(d.ftn_id)) - 3)
-                    .attr("width", d => x(d.ts + d.dur) - x(d.ts) < 6 ? 6 : x(d.ts + d.dur) - x(d.ts))
+                    .attr("y", d => y(Number(keyIndexMap.get(d.ftn_id))) - 3)
+                    .attr("width", d => x(d.ts + d.dur) - x(d.ts) < 6 ? 6 : x(d.ts + d.dur) - x(d.ts)) // comment this to allow brushing after zoom
                     .on("end", function() {
                         // Re-enable mouse events after transition ends
                         d3.select(this).style("pointer-events", "all");
@@ -305,7 +291,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 svg.selectAll("circle")
                     .transition().duration(750)
                     .attr("cx", d => x(d.ts))
-                    .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
+                    .attr("cy", d => y(Number(keyIndexMap.get(d.ftn_id))))
                     .on("end", function() {
                         // Re-enable mouse events after transition ends
                         d3.select(this).style("pointer-events", "all");
@@ -317,11 +303,11 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                 .transition().duration(750)
                 .attr("y1", d => {
                     const firstInDepth = sortedData.find(item => item.depth === d);
-                    return y(keyIndexMap.get(firstInDepth.ftn_id));
+                    return y(Number(keyIndexMap.get(firstInDepth.ftn_id)));
                 })
                 .attr("y2", d => {
                     const firstInDepth = sortedData.find(item => item.depth === d);
-                    return y(keyIndexMap.get(firstInDepth.ftn_id));
+                    return y(Number(keyIndexMap.get(firstInDepth.ftn_id)));
                 });
         }
 
@@ -339,7 +325,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                     svg.selectAll("rect")
                         .transition().duration(750)
                         .attr("x", d => x(d.ts))
-                        .attr("y", d => y(keyIndexMap.get(d.ftn_id)) - 3)
+                        .attr("y", d => y(Number(keyIndexMap.get(d.ftn_id))) - 3)
                         .attr("width", d => x(d.ts + d.dur) - x(d.ts) < 6 ? 6 : x(d.ts + d.dur) - x(d.ts))
                         .on("end", function() {
                             d3.select(this).style("pointer-events", "all");
@@ -348,7 +334,7 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                     svg.selectAll("circle")
                         .transition().duration(750)
                         .attr("cx", d => x(d.ts))
-                        .attr("cy", d => y(keyIndexMap.get(d.ftn_id)))
+                        .attr("cy", d => y(Number(keyIndexMap.get(d.ftn_id))))
                         .on("end", function() {
                             d3.select(this).style("pointer-events", "all");
                         });
@@ -359,14 +345,13 @@ const SpaceTime: React.FC<VisualizationProps> = ({ data }) => {
                     .transition().duration(750)
                     .attr("y1", d => {
                         const firstInDepth = sortedData.find(item => item.depth === d);
-                        return y(keyIndexMap.get(firstInDepth.ftn_id));
+                        return y(Number(keyIndexMap.get(firstInDepth.ftn_id)));
                     })
                     .attr("y2", d => {
                         const firstInDepth = sortedData.find(item => item.depth === d);
-                        return y(keyIndexMap.get(firstInDepth.ftn_id));
+                        return y(Number(keyIndexMap.get(firstInDepth.ftn_id)));
                     });
             }
-            // enableTooltips;
         });
 
         // Simple function to disable tooltips during transitions
