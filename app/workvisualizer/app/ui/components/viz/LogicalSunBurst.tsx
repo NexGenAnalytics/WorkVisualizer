@@ -67,6 +67,8 @@ const GlobalSunBurst = ({ data }) => {
             .selectAll("path")
             .data(root.descendants().slice(1))
             .join("path")
+            .attr("stroke-width", d => d.data.imbalance ? 2 : "none")
+            .attr("stroke", d => d.data.imbalance ? "#e60000" : "none")
             .attr("fill", d => colorScale(d.data.type))
             .attr("fill-opacity", d => arcVisible(d.current) ? (d.children ? 0.9 : 0.7) : 0)
             .attr("pointer-events", d => arcVisible(d.current) ? "auto" : "none")
@@ -80,7 +82,16 @@ const GlobalSunBurst = ({ data }) => {
             .on("click", clicked);
 
         path.append("title")
-            .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\nTotal Time: ${d.data.dur} s\n${d.data.count} calls\nAverage Duration Per Call ${d.data.dur / d.data.count} s\n`);
+        .text(d => {
+            const imbalanceInfo = d.data.imbalance && d.data.imbalance.length > 0
+                ? "\nImbalance:\n" + d.data.imbalance.map(entry => {
+                    const rank = Object.keys(entry)[0];
+                    const percentDiff = entry[rank] * 100; // convert to percentage
+                    return `  Rank ${rank}: ${percentDiff.toFixed(2)}%`;
+                }).join("\n")
+                : "";
+            return `${d.ancestors().map(d => d.data.name).reverse().join("/")}\nTotal Time: ${d.data.dur} s\n${d.data.count} calls\nAverage Duration Per Call: ${d.data.dur / d.data.count} s${imbalanceInfo}`;
+        });
 
         const parent = svg.append("circle")
             .datum(root)
@@ -115,6 +126,7 @@ const GlobalSunBurst = ({ data }) => {
                  })
                 .attr("fill-opacity", d => arcVisible(d.target) ? (d.children ? 0.9 : 0.7) : 0)
                 .attr("pointer-events", d => arcVisible(d.target) ? "auto" : "none")
+                .attr("stroke", d => arcVisible(d.target) ? (d.data.imbalance ? "#e60000" : "none") : "none")
                 .attrTween("d", d => () => arc(d.current));
         }
 

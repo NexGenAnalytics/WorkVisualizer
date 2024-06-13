@@ -40,6 +40,7 @@
 # Note: The original script has been edited
 
 import json
+import numpy as np
 import time
 import sys
 import os
@@ -273,8 +274,29 @@ class CaliTraceEventConverter:
         program_runtime = events_result[-1]["ts"] + events_result[-1]["dur"] - events_result[0]["ts"]
         metadata_result["program.runtime"] = program_runtime
         metadata_result["biggest.calls"] = biggest_events
+        metadata_result["imbalance"] = []
 
         indent = 4 if self.cfg["pretty_print"] else None
+
+        # Look for outlier ranks in the unique events
+        for event in self.unique_events_dict.values():
+            all_rank_times = {rank: rank_info["dur"] for rank, rank_info in event["rank_info"].items()}
+            average_time = np.mean(list(all_rank_times.values()))
+            std_dev = np.std(list(all_rank_times.values()))
+            for rank, time in all_rank_times.items():
+
+                if time > average_time + (1.5 * std_dev):         # This one will yield some imbalance (good for testing)
+                # if np.abs(average_time - time) > 2 * std_dev:   # This one is probably a better metric, but on ExaMiniMD will not yield any imbalance
+
+                    # Calculate percent difference
+                    pct_diff = (time - average_time) / average_time
+
+                    if "imbalance" not in self.unique_events_dict[event["ftn_id"]]:
+                        self.unique_events_dict[event["ftn_id"]]["imbalance"] = []
+                    self.unique_events_dict[event["ftn_id"]]["imbalance"].append({rank: pct_diff})
+
+                    # TODO: Improve metric for imbalance here
+                    metadata_result["imbalance"].append({"name": event["name"], "ftn_id": event["ftn_id"], "imbalance": pct_diff})
 
         for rank in self.known_ranks:
             with open(event_output_files[rank], "w") as event_output:

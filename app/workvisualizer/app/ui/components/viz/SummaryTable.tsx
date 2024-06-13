@@ -20,6 +20,19 @@ export default function SummaryTable({ data }) {
       }
   }
 
+  // Define a function to format the imbalance metric
+  function formatImbalance(imbalance) {
+    if (imbalance < 0.01) {
+        return imbalance.toExponential(2);
+    } else {
+        return imbalance.toFixed(2);
+    }
+  }
+
+  const sortedImbalance = data["imbalance"] && data["imbalance"].length > 0
+    ? [...data["imbalance"]].sort((a, b) => b.imbalance - a.imbalance)
+    : [];
+
   const calculateAverage = (rankInfo) => {
     const ranks = Object.values(rankInfo);
     const totalDuration = ranks.reduce((acc, rank) => acc + rank.dur, 0);
@@ -96,7 +109,35 @@ export default function SummaryTable({ data }) {
             </TableBody>
           </Table>
         </AccordionItem>
-        <AccordionItem key="3" aria-label="Largest calls" title="Largest Calls (averaged across ranks)">
+        <AccordionItem key="3" aria-label="Imbalanced calls" title="Imbalanced Calls">
+          {data["imbalance"] && data["imbalance"].length > 0 ? (
+            <Table
+              removeWrapper
+              color={selectedColor}
+              selectionMode="single"
+              defaultSelectedKeys={[]}
+              aria-label="Example static collection table"
+            >
+              <TableHeader>
+                <TableColumn>Function</TableColumn>
+                <TableColumn>Imbalance</TableColumn>
+              </TableHeader>
+              <TableBody>
+                {sortedImbalance.map((call, index) => {
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>{call.name}</TableCell>
+                      <TableCell>{formatImbalance(call.imbalance * 100)}%</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          ) : (
+            <p>No imbalance was found.</p>
+          )}
+        </AccordionItem>
+        <AccordionItem key="4" aria-label="Largest calls" title="Largest Calls (averaged across ranks)">
           <Table
             removeWrapper
             color={selectedColor}
