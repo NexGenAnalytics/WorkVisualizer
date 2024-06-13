@@ -90,8 +90,8 @@ export default function Page() {
     return (
         <div className='h-screen '>
             <NavBar/>
-            <div className='flex flex-row h-screen'>
-                <div className="flex flex-col p-4 h-screen" style={{ minWidth: '425px', maxWidth: '525px' }}>
+            <div className='flex flex-row h-full'>
+                <div className="flex flex-col p-4 h-full overflow-y-auto" style={{ minWidth: '425px', maxWidth: '525px' }}>
                     <Checkbox
                         className="min-w-full"
                         isSelected={isIndentedTreeSelected}
@@ -160,7 +160,7 @@ export default function Page() {
                     </Tabs>
                 </div>
                 <Divider orientation='vertical'/>
-                <div className="flex flex-row p-4 bg-slate-950">
+                <div className="flex flex-row p-4 bg-slate-950 h-full overflow-y-auto w-full">
                     <div className="overflow-auto">
                         {isIndentedTreeSelected && plotData['globalIndentedTree'] ? <GlobalIndentedTree data={plotData['globalIndentedTree']} /> : null}
                     </div>

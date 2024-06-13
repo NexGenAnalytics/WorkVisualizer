@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { CheckboxGroup, Checkbox } from '@nextui-org/react';
+import { CheckboxGroup, Checkbox, Spacer, Switch } from '@nextui-org/react';
 
 export const dataRequirements = {
     endpoint: '/api/logical_hierarchy/-1', // API endpoint for this component's data
@@ -11,6 +11,7 @@ export const dataRequirements = {
 const GlobalSunBurst = ({ data }) => {
     const ref = useRef();
     const [visibleTypes, setVisibleTypes] = useState(["collective", "mpi", "kokkos", "other"]);
+    const [showImbalance, setShowImbalance] = useState(true);
 
     useEffect(() => {
         const svg = d3.select(ref.current);
@@ -67,8 +68,8 @@ const GlobalSunBurst = ({ data }) => {
             .selectAll("path")
             .data(root.descendants().slice(1))
             .join("path")
-            .attr("stroke-width", d => d.data.imbalance ? 2 : "none")
-            .attr("stroke", d => d.data.imbalance ? "#e60000" : "none")
+            .attr("stroke-width", d => showImbalance ? (d.data.imbalance ? 2 : "none") : "none")
+            .attr("stroke", d => showImbalance ? (d.data.imbalance ? "#da0b54" : "none") : "none")
             .attr("fill", d => colorScale(d.data.type))
             .attr("fill-opacity", d => arcVisible(d.current) ? (d.children ? 0.9 : 0.7) : 0)
             .attr("pointer-events", d => arcVisible(d.current) ? "auto" : "none")
@@ -83,13 +84,17 @@ const GlobalSunBurst = ({ data }) => {
 
         path.append("title")
         .text(d => {
-            const imbalanceInfo = d.data.imbalance && d.data.imbalance.length > 0
-                ? "\nImbalance:\n" + d.data.imbalance.map(entry => {
-                    const rank = Object.keys(entry)[0];
-                    const percentDiff = entry[rank] * 100; // convert to percentage
-                    return `  Rank ${rank}: ${percentDiff.toFixed(2)}%`;
-                }).join("\n")
+            const imbalanceInfo = d.data.imbalance
+                ? (Array.isArray(d.data.imbalance)
+                    ? "\nImbalance:\n" + d.data.imbalance.map(entry => {
+                        const rank = Object.keys(entry)[0];
+                        const percentDiff = entry[rank] * 100; // convert to percentage
+                        return `  Rank ${rank}: ${percentDiff.toFixed(2)}%`;
+                    }).join("\n")
+                    : `\nImbalance: ${(d.data.imbalance * 100).toFixed(2)}%` // convert to percentage
+                )
                 : "";
+
             return `${d.ancestors().map(d => d.data.name).reverse().join("/")}\nTotal Time: ${d.data.dur} s\n${d.data.count} calls\nAverage Duration Per Call: ${d.data.dur / d.data.count} s${imbalanceInfo}`;
         });
 
@@ -126,7 +131,7 @@ const GlobalSunBurst = ({ data }) => {
                  })
                 .attr("fill-opacity", d => arcVisible(d.target) ? (d.children ? 0.9 : 0.7) : 0)
                 .attr("pointer-events", d => arcVisible(d.target) ? "auto" : "none")
-                .attr("stroke", d => arcVisible(d.target) ? (d.data.imbalance ? "#e60000" : "none") : "none")
+                .attr("stroke", d => showImbalance ? (arcVisible(d.target) ? (d.data.imbalance ? "#da0b54" : "none") : "none") : "none")
                 .attrTween("d", d => () => arc(d.current));
         }
 
@@ -141,11 +146,15 @@ const GlobalSunBurst = ({ data }) => {
             return d.y1 <= 3 && d.y0 >= 1 && d.x1 > d.x0;
         }
 
-    }, [data, visibleTypes]);
+    }, [data, visibleTypes, showImbalance]);
 
     const handleCheckboxChange = (values) => {
         setVisibleTypes(values);
     };
+
+    const handleImbalanceToggle = () => {
+        setShowImbalance(prevState => !prevState)
+    }
 
     return (
         <div>
@@ -161,6 +170,16 @@ const GlobalSunBurst = ({ data }) => {
                 <Checkbox color="success" value="kokkos">Kokkos</Checkbox>
                 <Checkbox color="secondary" value="other">Application</Checkbox>
             </CheckboxGroup>
+            <Spacer y={5} />
+            <Switch
+                defaultSelected
+                checked={showImbalance}
+                onChange={handleImbalanceToggle}
+                size="sm"
+                color="danger"
+            >
+                Highlight Imbalance
+            </Switch>
             <svg ref={ref} width={700} height={700} />
         </div>
     );

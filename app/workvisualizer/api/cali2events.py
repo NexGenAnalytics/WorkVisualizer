@@ -280,9 +280,11 @@ class CaliTraceEventConverter:
 
         # Look for outlier ranks in the unique events
         for event in self.unique_events_dict.values():
+            ftn_id = event["ftn_id"]
             all_rank_times = {rank: rank_info["dur"] for rank, rank_info in event["rank_info"].items()}
             average_time = np.mean(list(all_rank_times.values()))
             std_dev = np.std(list(all_rank_times.values()))
+            diffs = []
             for rank, time in all_rank_times.items():
 
                 if time > average_time + (1.5 * std_dev):         # This one will yield some imbalance (good for testing)
@@ -291,12 +293,16 @@ class CaliTraceEventConverter:
                     # Calculate percent difference
                     pct_diff = (time - average_time) / average_time
 
-                    if "imbalance" not in self.unique_events_dict[event["ftn_id"]]:
-                        self.unique_events_dict[event["ftn_id"]]["imbalance"] = []
-                    self.unique_events_dict[event["ftn_id"]]["imbalance"].append({rank: pct_diff})
+                    if "imbalance" not in self.unique_events_dict[ftn_id]:
+                        self.unique_events_dict[ftn_id]["imbalance"] = []
+                    self.unique_events_dict[ftn_id]["imbalance"].append({rank: pct_diff})
 
-                    # TODO: Improve metric for imbalance here
-                    metadata_result["imbalance"].append({"name": event["name"], "ftn_id": event["ftn_id"], "imbalance": pct_diff})
+                    self.rank_unique_events_dict[rank][ftn_id]["imbalance"] = pct_diff
+                    diffs.append(pct_diff)
+
+            # TODO: Improve metric for imbalance here (this is only recording pct_diff for one rank)
+            if len(diffs) > 0:
+                metadata_result["imbalance"].append({"name": event["name"], "ftn_id": ftn_id, "imbalance": sum(diffs)/len(diffs)})
 
         for rank in self.known_ranks:
             with open(event_output_files[rank], "w") as event_output:
