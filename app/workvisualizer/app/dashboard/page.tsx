@@ -18,13 +18,13 @@ interface Plot {
     }
 }
 
-let known_ranks = [0]
+let known_ranks : string[] = []
 let known_depths = [1]
 let maximum_depth = 1
 
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
-    const [selectedRank, setSelectedRank] = useState<string | "0">("0");
+    const [selectedRank, setSelectedRank] = useState<string | "all">("all");
     const [selectedDepth, setSelectedDepth] = useState<number | 5>(5);
     const [isIndentedTreeSelected, setIsIndentedTreeSelected] = useState(false);
     const [plotData, setPlotData] = useState<any>({});
@@ -34,10 +34,10 @@ export default function Page() {
         //      root (only for hierarchies): -1 (shows entire available tree)
         //      depth:                        5 (only parses records with path depth < 5)
         //      rank:                         0 (default to rank 0)
-        { key: 'globalIndentedTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1/5/0' } },
-        { key: 'logicalSunBurst', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1/5/0'} },
-        { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime/5/0'} },
-        { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/0' } },
+        { key: 'globalIndentedTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1/5/all' } },
+        { key: 'logicalSunBurst', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1/5/all'} },
+        { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime/5/all'} },
+        { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/all' } },
         ]);
 
     const handleRankChange = (event: React.ChangeEvent<HTMLInputElement>) => {
