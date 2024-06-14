@@ -15,7 +15,7 @@ const GlobalIndentedTree = ({ data }) => {
         svg.selectAll('*').remove();
 
         const format = d3.format(",");
-        const nodeSize = 17;
+        const nodeSize = 22;
         const root = d3.hierarchy(data).eachBefore((i => d => d.index = i++)(0));
         const nodes = root.descendants();
         const width = 928;
