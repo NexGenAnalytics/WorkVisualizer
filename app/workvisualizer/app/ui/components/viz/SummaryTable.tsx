@@ -1,6 +1,7 @@
 'use client'
 import React from "react";
 import {Table, TableHeader, TableColumn, TableBody, TableRow, TableCell, RadioGroup, Radio} from "@nextui-org/react";
+import {Accordion, AccordionItem} from "@nextui-org/accordion";
 
 export const dataRequirements = {
     endpoint: '/api/metadata', // API endpoint for this component's data
@@ -18,6 +19,19 @@ export default function SummaryTable({ data }) {
           return time.toFixed(4);
       }
   }
+
+  // Define a function to format the imbalance metric
+  function formatImbalance(imbalance) {
+    if (imbalance < 0.01) {
+        return imbalance.toExponential(2);
+    } else {
+        return imbalance.toFixed(2);
+    }
+  }
+
+  const sortedImbalance = data["imbalance"] && data["imbalance"].length > 0
+    ? [...data["imbalance"]].sort((a, b) => b.imbalance - a.imbalance)
+    : [];
 
   const calculateAverage = (rankInfo) => {
     const ranks = Object.values(rankInfo);
@@ -39,81 +53,119 @@ export default function SummaryTable({ data }) {
   return (
     <div className="flex flex-col gap-3">
 
-      <p className="font-bold text-medium">Program Information</p>
+      <Accordion selectionMode="multiple" defaultExpandedKeys={["1"]}>
 
-      <Table
-        hideHeader
-        color={selectedColor}
-        selectionMode="single"
-        defaultSelectedKeys={[]}
-        aria-label="Example static collection table"
-      >
-        <TableHeader>
-          <TableColumn>PROGRAM INFORMATION</TableColumn>
-          <TableColumn> </TableColumn>
-        </TableHeader>
-        <TableBody>
-          <TableRow key="1">
-            <TableCell>Number of Ranks</TableCell>
-            <TableCell>{data["mpi.world.size"]}</TableCell>
-          </TableRow>
-          <TableRow key="2">
-            <TableCell>Program Runtime</TableCell>
-            <TableCell>{formatTime(data["program.runtime"])} s</TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-
-      <p className="font-bold text-medium">Call Distribution (averaged across ranks)</p>
-
-      <Table
-        color={selectedColor}
-        selectionMode="single"
-        defaultSelectedKeys={[]}
-        aria-label="Example static collection table"
-      >
-        <TableHeader>
-          <TableColumn>Call Type</TableColumn>
-          <TableColumn>Total Counts</TableColumn>
-          <TableColumn>Unique Counts</TableColumn>
-        </TableHeader>
-        <TableBody>
-          {callTypes.map((type, index) => (
-            <TableRow key={index}>
-              <TableCell>{callTypeLabels[type]}</TableCell>
-              <TableCell>{data["total.counts"]["average"][type]}</TableCell>
-              <TableCell>{data["unique.counts"]["average"][type]}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-
-      <p className="font-bold text-medium">Largest Calls (averaged across ranks)</p>
-
-      <Table
-        color={selectedColor}
-        selectionMode="single"
-        defaultSelectedKeys={[]}
-        aria-label="Example static collection table"
-      >
-        <TableHeader>
-          <TableColumn>Function</TableColumn>
-          <TableColumn>Time Spent</TableColumn>
-          <TableColumn>Number of Instances</TableColumn>
-        </TableHeader>
-        <TableBody>
-          {data["biggest.calls"].map((call, index) => {
-            const { averageDuration, averageCount } = calculateAverage(call.rank_info);
-            return (
-              <TableRow key={index}>
-                <TableCell>{call.name}</TableCell>
-                <TableCell>{formatTime(averageDuration)} s</TableCell>
-                <TableCell>{averageCount.toFixed(2)}</TableCell>
+        <AccordionItem key="1" aria-label="Program Information" title="Program Information">
+          <Table
+            hideHeader
+            removeWrapper
+            color={selectedColor}
+            selectionMode="single"
+            defaultSelectedKeys={[]}
+            aria-label="Example static collection table"
+          >
+            <TableHeader>
+              <TableColumn>PROGRAM INFORMATION</TableColumn>
+              <TableColumn> </TableColumn>
+            </TableHeader>
+            <TableBody>
+              <TableRow key="1">
+                <TableCell>Comm Size</TableCell>
+                <TableCell>{data["mpi.world.size"]}</TableCell>
               </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+              <TableRow key="2">
+                <TableCell>Received Ranks</TableCell>
+                <TableCell>{data["known.ranks"].join(", ")}</TableCell>
+              </TableRow>
+              <TableRow key="3">
+                <TableCell>Program Runtime</TableCell>
+                <TableCell>{formatTime(data["program.runtime"])} s</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </AccordionItem>
+
+        <AccordionItem key="2" aria-label="Call Distribution" title="Call Distribution (averaged across ranks)">
+          <Table
+            removeWrapper
+            color={selectedColor}
+            selectionMode="single"
+            defaultSelectedKeys={[]}
+            aria-label="Example static collection table"
+          >
+            <TableHeader>
+              <TableColumn>Call Type</TableColumn>
+              <TableColumn>Total Counts</TableColumn>
+              <TableColumn>Unique Counts</TableColumn>
+            </TableHeader>
+            <TableBody>
+              {callTypes.map((type, index) => (
+                <TableRow key={index}>
+                  <TableCell>{callTypeLabels[type]}</TableCell>
+                  <TableCell>{data["total.counts"]["average"][type]}</TableCell>
+                  <TableCell>{data["unique.counts"]["global"][type]}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </AccordionItem>
+        <AccordionItem key="3" aria-label="Imbalanced calls" title="Imbalanced Calls">
+          {data["imbalance"] && data["imbalance"].length > 0 ? (
+            <Table
+              removeWrapper
+              color={selectedColor}
+              selectionMode="single"
+              defaultSelectedKeys={[]}
+              aria-label="Example static collection table"
+            >
+              <TableHeader>
+                <TableColumn>Function</TableColumn>
+                <TableColumn>Imbalance</TableColumn>
+              </TableHeader>
+              <TableBody>
+                {sortedImbalance.map((call, index) => {
+                  return (
+                    <TableRow key={index}>
+                      <TableCell>{call.name}</TableCell>
+                      <TableCell>{formatImbalance(call.imbalance * 100)}%</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          ) : (
+            <p>No imbalance was found.</p>
+          )}
+        </AccordionItem>
+        <AccordionItem key="4" aria-label="Largest calls" title="Largest Calls (averaged across ranks)">
+          <Table
+            removeWrapper
+            color={selectedColor}
+            selectionMode="single"
+            defaultSelectedKeys={[]}
+            aria-label="Example static collection table"
+          >
+            <TableHeader>
+              <TableColumn>Function</TableColumn>
+              <TableColumn>Time Spent</TableColumn>
+              <TableColumn>Number of Instances</TableColumn>
+            </TableHeader>
+            <TableBody>
+              {data["biggest.calls"].map((call, index) => {
+                const { averageDuration, averageCount } = calculateAverage(call.rank_info);
+                return (
+                  <TableRow key={index}>
+                    <TableCell>{call.name}</TableCell>
+                    <TableCell>{formatTime(averageDuration)} s</TableCell>
+                    <TableCell>{averageCount.toFixed(2)}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </AccordionItem>
+      </Accordion>
+
     </div>
   );
 }

@@ -1,32 +1,47 @@
 'use client'
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import { CheckboxGroup, Checkbox, Spacer, Switch } from '@nextui-org/react';
 
 export const dataRequirements = {
     endpoint: '/api/logical_hierarchy/-1', // API endpoint for this component's data
-    params: {} // Additional parameters if needed
+    params: {}                             // Additional parameters if needed
 };
 
 const GlobalSunBurst = ({ data }) => {
     const ref = useRef();
+    const [visibleTypes, setVisibleTypes] = useState(["collective", "mpi", "kokkos", "other"]);
+    const [showImbalance, setShowImbalance] = useState(true);
 
     useEffect(() => {
         const svg = d3.select(ref.current);
         svg.selectAll('*').remove();
 
         // Specify the chart’s dimensions.
-        const width = 928;
+        const width = 700;
         const height = width;
         const radius = width / 6;
 
         // Create the color scale.
-        // const color = d3.scaleOrdinal(d3.quantize(d3.interpolateRainbow, data.children.length + 1));
         const colorScale = d3.scaleOrdinal()
             .domain(["collective", "mpi", "kokkos", "other"])
-            .range(["#1f77b4","#ff7f0e","#2ca02c", "#a783c9"]);
+            .range(["#1f77b4", "#f5a524", "#2ca02c", "#a783c9"]);
+
+        // Filter data to include only nodes with visible types
+        const filterData = (node) => {
+            if (!node.children) {
+                return visibleTypes.includes(node.type) ? { ...node } : null;
+            }
+
+            // If the node's type is in visibleTypes, recursively filter its children
+            const children = node.children.map(filterData).filter(d => d);
+            return { ...node, children };
+        };
+
+        const filteredData = filterData(data);
 
         // Compute the layout.
-        const hierarchy = d3.hierarchy(data)
+        const hierarchy = d3.hierarchy(filteredData)
             .sum(d => Math.sqrt(d.dur))
             .sort((a, b) => b.value - a.value);
         const root = d3.partition()
@@ -41,7 +56,7 @@ const GlobalSunBurst = ({ data }) => {
             .padAngle(d => Math.min((d.x1 - d.x0) / 2, 0.005))
             .padRadius(radius * 1.5)
             .innerRadius(d => d.y0 * radius)
-            .outerRadius(d => Math.max(d.y0 * radius, d.y1 * radius - 1))
+            .outerRadius(d => Math.max(d.y0 * radius, d.y1 * radius - 1));
 
         // Create the SVG container.
         svg
@@ -53,10 +68,11 @@ const GlobalSunBurst = ({ data }) => {
             .selectAll("path")
             .data(root.descendants().slice(1))
             .join("path")
+            .attr("stroke-width", d => showImbalance ? (d.data.imbalance ? 2 : "none") : "none")
+            .attr("stroke", d => showImbalance ? (d.data.imbalance ? "#da0b54" : "none") : "none")
             .attr("fill", d => colorScale(d.data.type))
             .attr("fill-opacity", d => arcVisible(d.current) ? (d.children ? 0.9 : 0.7) : 0)
             .attr("pointer-events", d => arcVisible(d.current) ? "auto" : "none")
-
             .attr("d", d => arc(d.current));
 
         // Make them clickable if they have children.
@@ -66,21 +82,21 @@ const GlobalSunBurst = ({ data }) => {
             // .on("mouseleave", mouseleave)
             .on("click", clicked);
 
-        const format = d3.format(",d");
         path.append("title")
-            .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\nTotal Time: ${d.data.dur} s\n${d.data.count} calls\nAverage Duration Per Call ${d.data.dur / d.data.count} s\n`);
+        .text(d => {
+            const imbalanceInfo = d.data.imbalance
+                ? (Array.isArray(d.data.imbalance)
+                    ? "\nImbalance:\n" + d.data.imbalance.map(entry => {
+                        const rank = Object.keys(entry)[0];
+                        const percentDiff = entry[rank] * 100; // convert to percentage
+                        return `  Rank ${rank}: ${percentDiff.toFixed(2)}%`;
+                    }).join("\n")
+                    : `\nImbalance: ${(d.data.imbalance * 100).toFixed(2)}%` // convert to percentage
+                )
+                : "";
 
-        // const label = svg.append("g")
-        //     .attr("pointer-events", "none")
-        //     .attr("text-anchor", "middle")
-        //     .style("user-select", "none")
-        //   .selectAll("text")
-        //   .data(root.descendants().slice(1))
-        //   .join("text")
-        //     .attr("dy", "0.35em")
-        //     .attr("fill-opacity", d => +labelVisible(d.current))
-        //     .attr("transform", d => labelTransform(d.current))
-        //     .text(d => d.data.name);
+            return `${d.ancestors().map(d => d.data.name).reverse().join("/")}\nTotal Time: ${d.data.dur} s\n${d.data.count} calls\nAverage Duration Per Call: ${d.data.dur / d.data.count} s${imbalanceInfo}`;
+        });
 
         const parent = svg.append("circle")
             .datum(root)
@@ -89,18 +105,9 @@ const GlobalSunBurst = ({ data }) => {
             .attr("pointer-events", "all")
             .on("click", clicked);
 
-        // parent.append("text")
-        //     .attr("dy", ".35em")
-        //     .style("text-anchor", "middle")
-        //     .style("font-size", "16px")
-        //     .text("testing");
-
         // Handle zoom on click.
         function clicked(event, p) {
-            d3.select(this).style("pointer-events", "none");
             parent.datum(p.parent || root);
-            // parent.select("text")
-            //   .text(p.parent ? p.parent.data.name : "");
 
             root.each(d => d.target = {
             x0: Math.max(0, Math.min(1, (d.x0 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
@@ -109,7 +116,6 @@ const GlobalSunBurst = ({ data }) => {
             y1: Math.max(0, d.y1 - p.depth)
             });
 
-
             const t = svg.transition().duration(750);
 
             // Transition the data on all arcs, even the ones that aren’t visible,
@@ -117,22 +123,16 @@ const GlobalSunBurst = ({ data }) => {
             // the next transition from the desired position.
             path.transition(t)
                 .tween("data", d => {
-                const i = d3.interpolate(d.current, d.target);
-                return t => d.current = i(t);
+                    const i = d3.interpolate(d.current, d.target);
+                    return t => d.current = i(t);
                 })
-            .filter(function(d) {
-                return +this.getAttribute("fill-opacity") || arcVisible(d.target);
-            })
+                .filter(function(d) {
+                    return +this.getAttribute("fill-opacity") || arcVisible(d.target);
+                 })
                 .attr("fill-opacity", d => arcVisible(d.target) ? (d.children ? 0.9 : 0.7) : 0)
                 .attr("pointer-events", d => arcVisible(d.target) ? "auto" : "none")
-
+                .attr("stroke", d => showImbalance ? (arcVisible(d.target) ? (d.data.imbalance ? "#da0b54" : "none") : "none") : "none")
                 .attrTween("d", d => () => arc(d.current));
-            // label.filter(function(d) {
-            //     return +this.getAttribute("fill-opacity") || labelVisible(d.target);
-            //   }).transition(t)
-            //     .attr("fill-opacity", d => +labelVisible(d.target))
-            //     .attrTween("transform", d => () => labelTransform(d.current));
-            d3.select(this).style("pointer-events", "all");
         }
 
         function mouseenter(event, d) {
@@ -142,70 +142,46 @@ const GlobalSunBurst = ({ data }) => {
               .attr("stroke-width", 1);
         }
 
-        function mouseleave(event, d) {
-          d3.select(this).transition()
-              .duration("50")
-              .attr("stroke", "none")
-        }
-
         function arcVisible(d) {
             return d.y1 <= 3 && d.y0 >= 1 && d.x1 > d.x0;
         }
 
-        function labelVisible(d) {
-            return d.y1 <= 3 && d.y0 >= 1 && (d.y1 - d.y0) * (d.x1 - d.x0) > 0.03;
-        }
+    }, [data, visibleTypes, showImbalance]);
 
-        function labelTransform(d) {
-            const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
-            const y = (d.y0 + d.y1) / 2 * radius;
-            return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
-        }
+    const handleCheckboxChange = (values) => {
+        setVisibleTypes(values);
+    };
 
-        // LEGEND
-
-        // // Create a legend
-        // const legend = svg.append("g")
-        //     .attr("class", "legend")
-        //     .attr("transform", `translate(40, 20)`); // Adjust the position of the legend
-
-        // // Add legend items
-        // const legendItems = legend.selectAll(".legend-item")
-        //     .data(colorScale.domain())
-        //     .enter().append("g")
-        //     .attr("class", "legend-item")
-        //     .attr("transform", (d, i) => `translate(0, ${i * 20})`);
-
-        // // Add colored rectangles
-        // legendItems.append("rect")
-        //     .attr("x", 0)
-        //     .attr("width", 10)
-        //     .attr("height", 10)
-        //     .attr("fill", colorScale);
-
-        // // Add text labels
-        // legendItems.append("text")
-        //     .attr("x", 15)
-        //     .attr("y", 5)
-        //     .attr("dy", "0.75em")
-        //     .attr("fill", "currentColor")
-        //     .style("font-size", "10px")
-        //     .text(d => d);
-
-        // // Add a background rectangle for the legend
-        // legend.insert("rect", ":first-child")
-        //     .attr("x", -5)
-        //     .attr("y", -5)
-        //     .attr("width", 110)
-        //     .attr("height", colorScale.domain().length * 20 + 10)
-        //     .attr("fill", "white")
-        //     .attr("opacity", 0.3)
-        //     .attr("stroke", "none");
-
-    }, [data]);
+    const handleImbalanceToggle = () => {
+        setShowImbalance(prevState => !prevState)
+    }
 
     return (
-        <svg ref={ref} width={928} height={928} />
+        <div>
+            <CheckboxGroup
+                size="sm"
+                orientation="horizontal"
+                color="primary"
+                defaultValue={visibleTypes}
+                onChange={handleCheckboxChange}
+            >
+                <Checkbox color="primary" value="collective">MPI Collective</Checkbox>
+                <Checkbox color="warning" value="mpi">MPI Point-To-Point</Checkbox>
+                <Checkbox color="success" value="kokkos">Kokkos</Checkbox>
+                <Checkbox color="secondary" value="other">Application</Checkbox>
+            </CheckboxGroup>
+            <Spacer y={5} />
+            <Switch
+                defaultSelected
+                checked={showImbalance}
+                onChange={handleImbalanceToggle}
+                size="sm"
+                color="danger"
+            >
+                Highlight Imbalance
+            </Switch>
+            <svg ref={ref} width={700} height={700} />
+        </div>
     );
 };
 

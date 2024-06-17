@@ -1,4 +1,5 @@
 fastapi
+numpy
 uvicorn
 caliper-reader
 python-multipart

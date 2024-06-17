@@ -40,6 +40,7 @@
 # Note: The original script has been edited
 
 import json
+import numpy as np
 import time
 import sys
 import os
@@ -161,7 +162,7 @@ class CaliTraceEventConverter:
         'pthread.id',
     ]
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, maximum_depth_limit=5):
         self.cfg     = cfg
 
         self.records = []
@@ -181,13 +182,21 @@ class CaliTraceEventConverter:
         self.skipped = 0
         self.written = 0
 
+        # Filtering data
+        self.maximum_depth_limit = maximum_depth_limit
+
         # These keep track of metadata
+        # TODO: there must be a cleaner way to do this
         self.event_id_iterator = 0
-        self.event_counters = {}
+        self.rank_event_counters = {}
+        self.unique_event_counters = {}
         self.unique_functions = []
         self.known_ftns = []
         self.known_ranks = []
+        self.known_depths = []
+        self.rank_unique_events_dict = {}
         self.unique_events_dict = {}
+        self.max_depth = 0
 
     def read(self, filename_or_stream):
         self.reader.read(filename_or_stream, self._process_record)
@@ -214,49 +223,97 @@ class CaliTraceEventConverter:
             self._process_record(rec[1])
         self.end_timing(ts)
 
-    def write(self, events_output, metadata_output, hierarchy_output):
-        result = dict(traceEvents=self.records, otherData=self.reader.globals)
+    def write(self, files_dir):
 
-        if len(self.stackframes.nodes) > 0:
-            result["stackFrames"] = self.stackframes.get_stackframes()
-        if len(self.samples) > 0:
-            result["samples"] = self.samples
+        depth_desc = "depth_full" if self.maximum_depth_limit is None else f"depth_{self.maximum_depth_limit}"
+        event_output_files = {rank: os.path.join(files_dir, "events", f"events-{rank}-{depth_desc}.json") for rank in self.known_ranks}
+        unique_events_output_files = {rank: os.path.join(files_dir, "unique-events", f"unique-events-{rank}-{depth_desc}.json") for rank in self.known_ranks}
+        metadata_output_file = os.path.join(files_dir, "metadata", f"metadata-{depth_desc}.json")
+        unique_events_output_file = os.path.join(files_dir, "unique-events", f"unique-events-all-{depth_desc}.json")
 
-        events_result = sorted(result["traceEvents"], key=lambda event : event["ts"])
+        # if len(self.stackframes.nodes) > 0:
+        #     result["stackFrames"] = self.stackframes.get_stackframes()
+        # if len(self.samples) > 0:
+        #     result["samples"] = self.samples
+
+        events_result = sorted(self.records, key=lambda event : event["ts"])
+        # Separate into rank specific lists
+        events_per_rank = {rank: [] for rank in self.known_ranks}
+        for event in events_result:
+            events_per_rank[event["rank"]].append(event)
+        # TODO: look in every rank for biggest events (not just 0)
         biggest_events = sorted(list(self.unique_events_dict.values()), key=lambda event : event["dur"], reverse=True)[:10]
-        metadata_result = result["otherData"]
+        metadata_result = self.reader.globals
+        metadata_result["known.ranks"] = self.known_ranks
+        metadata_result["known.depths"] = self.known_depths
+        metadata_result["maximum.depth"] = max(self.known_depths)
         metadata_result["unique.counts"] = {}
         metadata_result["total.counts"] = {}
         agg_counts = {"total_count": {}, "unique_count": {}, "time": {}}
         for rank in self.known_ranks:
-            metadata_result["unique.counts"][f"rank.{rank}"] = {"kokkos": self.event_counters[rank]["kokkos"]["unique_count"],
-                                                                "mpi_p2p": self.event_counters[rank]["mpi"]["unique_count"],
-                                                                "mpi_collective": self.event_counters[rank]["collective"]["unique_count"],
-                                                                "other": self.event_counters[rank]["other"]["unique_count"]}
-            metadata_result["total.counts"][f"rank.{rank}"] = {"kokkos": self.event_counters[rank]["kokkos"]["total_count"],
-                                                               "mpi_p2p": self.event_counters[rank]["mpi"]["total_count"],
-                                                               "mpi_collective": self.event_counters[rank]["collective"]["total_count"],
-                                                               "other": self.event_counters[rank]["other"]["total_count"]}
-            for call_type in self.event_counters[rank].keys():
-                for key, val in self.event_counters[rank][call_type].items():
+            metadata_result["unique.counts"][f"rank.{rank}"] = {"kokkos": self.rank_event_counters[rank]["kokkos"]["unique_count"],
+                                                                "mpi_p2p": self.rank_event_counters[rank]["mpi"]["unique_count"],
+                                                                "mpi_collective": self.rank_event_counters[rank]["collective"]["unique_count"],
+                                                                "other": self.rank_event_counters[rank]["other"]["unique_count"]}
+            metadata_result["total.counts"][f"rank.{rank}"] = {"kokkos": self.rank_event_counters[rank]["kokkos"]["total_count"],
+                                                               "mpi_p2p": self.rank_event_counters[rank]["mpi"]["total_count"],
+                                                               "mpi_collective": self.rank_event_counters[rank]["collective"]["total_count"],
+                                                               "other": self.rank_event_counters[rank]["other"]["total_count"]}
+            for call_type in self.rank_event_counters[rank].keys():
+                for key, val in self.rank_event_counters[rank][call_type].items():
                     if call_type not in agg_counts[key]:
                         agg_counts[key][call_type] = val
                     else:
                         agg_counts[key][call_type] += val
 
-        avg_unique_counts = {"average": {key: val/len(self.known_ranks) for key, val in agg_counts["unique_count"].items()}}
+        # avg_unique_counts = {"average": {key: val/len(self.known_ranks) for key, val in agg_counts["unique_count"].items()}}
         avg_total_counts = {"average": {key: val/len(self.known_ranks) for key, val in agg_counts["total_count"].items()}}
 
-        metadata_result["unique.counts"].update(avg_unique_counts)
+        metadata_result["unique.counts"].update({"global": self.unique_event_counters})
         metadata_result["total.counts"].update(avg_total_counts)
         program_runtime = events_result[-1]["ts"] + events_result[-1]["dur"] - events_result[0]["ts"]
         metadata_result["program.runtime"] = program_runtime
         metadata_result["biggest.calls"] = biggest_events
+        metadata_result["imbalance"] = []
 
         indent = 4 if self.cfg["pretty_print"] else None
-        json.dump(events_result, events_output, indent=indent)
-        json.dump(metadata_result, metadata_output, indent=indent)
-        json.dump(sorted(list((self.unique_events_dict.values())), key=lambda e : e["depth"]), hierarchy_output, indent=indent)
+
+        # Look for outlier ranks in the unique events
+        for event in self.unique_events_dict.values():
+            ftn_id = event["ftn_id"]
+            all_rank_times = {rank: rank_info["dur"] for rank, rank_info in event["rank_info"].items()}
+            average_time = np.mean(list(all_rank_times.values()))
+            std_dev = np.std(list(all_rank_times.values()))
+            diffs = []
+            for rank, time in all_rank_times.items():
+
+                if time > average_time + (1.5 * std_dev):         # This one will yield some imbalance (good for testing)
+                # if np.abs(average_time - time) > 2 * std_dev:   # This one is probably a better metric, but on ExaMiniMD will not yield any imbalance
+
+                    # Calculate percent difference
+                    pct_diff = (time - average_time) / average_time
+
+                    if "imbalance" not in self.unique_events_dict[ftn_id]:
+                        self.unique_events_dict[ftn_id]["imbalance"] = []
+                    self.unique_events_dict[ftn_id]["imbalance"].append({rank: pct_diff})
+
+                    self.rank_unique_events_dict[rank][ftn_id]["imbalance"] = pct_diff
+                    diffs.append(pct_diff)
+
+            # TODO: Improve metric for imbalance here (this is only recording pct_diff for one rank)
+            if len(diffs) > 0:
+                metadata_result["imbalance"].append({"name": event["name"], "ftn_id": ftn_id, "imbalance": sum(diffs)/len(diffs)})
+
+        for rank in self.known_ranks:
+            with open(event_output_files[rank], "w") as event_output:
+                json.dump(events_per_rank[rank], event_output, indent=indent)
+            with open(unique_events_output_files[rank], "w") as unique_events_output:
+                json.dump(sorted(list((self.rank_unique_events_dict[rank].values())), key=lambda e : e["depth"]), unique_events_output, indent=indent)
+        with open(unique_events_output_file, "w") as unique_events_output_all:
+            json.dump(sorted(list((self.unique_events_dict.values())), key=lambda e: e["depth"]), unique_events_output_all, indent=indent)
+        with open(metadata_output_file, "w") as metadata_output:
+            json.dump(metadata_result, metadata_output, indent=indent)
+
         self.written += len(self.records) + len(self.samples)
 
     def sync_timestamps(self):
@@ -283,6 +340,30 @@ class CaliTraceEventConverter:
 
         if self.cfg["verbose"]:
             print(f" done ({tot:.2f}s).", file=sys.stderr)
+
+    def _get_type(self, function_name):
+        if "MPI_" in function_name:
+            if function_name in all_collectives:
+                return "collective"
+            else:
+                return "mpi"
+        elif "Kokkos::" in function_name:
+            return "kokkos"
+        else:
+            return "other"
+
+    def filter_rec(self, key, rec):
+        keys = list(rec.keys())
+        kernel_type_filter = "kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]
+        depth_filter = key.startswith("event.begin#") and len(rec.get("path", [])) >= int(self.maximum_depth_limit) or \
+                       key.startswith("event.end#") and len(rec.get("path", [])) - 1 >= int(self.maximum_depth_limit)
+
+        if key.startswith("event.begin#"):
+            depth = len(rec.get("path", []))
+            if depth not in self.known_depths and depth > 0:
+                self.known_depths.append(depth)
+
+        return kernel_type_filter or depth_filter
 
     def _process_record(self, rec):
         pid  = int(_get_first_from_list(rec, self.pid_attributes))
@@ -312,7 +393,7 @@ class CaliTraceEventConverter:
         else:
             keys = list(rec.keys())
             for key in keys:
-                if "kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]:
+                if self.filter_rec(key, rec):
                     continue
                 if key.startswith("event.begin#"):
                     self._process_event_begin_rec(rec, (pid, tid), key)
@@ -372,10 +453,13 @@ class CaliTraceEventConverter:
 
         depth = len(raw_path)
 
+        if depth > self.max_depth:
+            self.max_depth = depth
+
         rank = int(rec.get("mpi.rank"))
         if rank not in self.known_ranks:
             self.known_ranks.append(rank)
-            self.event_counters[rank] = counts_template_dict
+            self.rank_event_counters[rank] = counts_template_dict
 
         skey = (loc,attr)
 
@@ -393,28 +477,24 @@ class CaliTraceEventConverter:
 
         self._get_stackframe(rec, trec)
 
-        if "MPI_" in name:
-            if name in all_collectives:
-                type = "collective"
-            else:
-                type = "mpi"
-        elif "Kokkos::" in name:
-            type = "kokkos"
-        else:
-            type = "other"
+        type = self._get_type(name)
 
-        self.event_counters[rank][type]["time"] += (tst-btst)
-        self.event_counters[rank][type]["total_count"] += 1
+        self.rank_event_counters[rank][type]["time"] += (tst-btst)
+        self.rank_event_counters[rank][type]["total_count"] += 1
 
         # Removed from trec: {ph="X", cat=attr}
         trec.update(name=name, eid=eid, ftn_id=ftn_id, depth=depth, type=type, ts=btst, dur=dur, path=path, kernel_type=kernel_type, rank=rank)
 
         if name not in self.unique_functions:
-            self.event_counters[rank][type]["unique_count"] += 1
+            self.rank_event_counters[rank][type]["unique_count"] += 1
             self.unique_functions.append(name)
+            if type not in self.unique_event_counters:
+                self.unique_event_counters[type] = 1
+            else:
+                self.unique_event_counters[type] += 1
 
         if ftn_id not in self.unique_events_dict:
-            self.unique_events_dict[ftn_id] = trec
+            self.unique_events_dict[ftn_id] = trec.copy()
             self.unique_events_dict[ftn_id]["count"] = 1
             self.unique_events_dict[ftn_id]["rank_info"] = {rank: {"count": 1, "dur": dur}}
             del self.unique_events_dict[ftn_id]["rank"]
@@ -428,7 +508,17 @@ class CaliTraceEventConverter:
                 self.unique_events_dict[ftn_id]["rank_info"][rank]["count"] += 1
                 self.unique_events_dict[ftn_id]["rank_info"][rank]["dur"] += dur
 
+        if rank not in self.rank_unique_events_dict:
+            self.rank_unique_events_dict[rank] = {}
 
+        if ftn_id not in self.rank_unique_events_dict[rank]:
+            self.rank_unique_events_dict[rank][ftn_id] = trec.copy()
+            self.rank_unique_events_dict[rank][ftn_id]["count"] = 1
+            del self.rank_unique_events_dict[rank][ftn_id]["rank"]
+            del self.rank_unique_events_dict[rank][ftn_id]["eid"]
+        else:
+            self.rank_unique_events_dict[rank][ftn_id]["dur"] += dur
+            self.rank_unique_events_dict[rank][ftn_id]["count"] += 1
 
     def _process_cupti_activity_rec(self, rec, trec):
         cat  = rec["cupti.activity.kind"]
@@ -482,16 +572,9 @@ class CaliTraceEventConverter:
             trec.update(sf=sf)
 
 
-def convert_cali_to_json(input_files: list, files_dir: str):
-
-    event_output_file = os.path.join(files_dir, "events.json")
-    metadata_output_file = os.path.join(files_dir, "metadata.json")
-    unique_events_output_file = os.path.join(files_dir, "unique_events.json")
+def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit: int = 5):
 
     cfg = {
-        "event_output": open(event_output_file, "w"),
-        "metadata_output": open(metadata_output_file, "w"),
-        "unique_events_output": open(unique_events_output_file, "w"),
         "pretty_print": True,
         "sync_timestamps": True,
         "counters": {},
@@ -500,7 +583,7 @@ def convert_cali_to_json(input_files: list, files_dir: str):
         "verbose": False
     }
 
-    converter = CaliTraceEventConverter(cfg)
+    converter = CaliTraceEventConverter(cfg, maximum_depth_limit)
 
     begin = time.perf_counter()
 
@@ -514,11 +597,8 @@ def convert_cali_to_json(input_files: list, files_dir: str):
         converter.end_timing(ts)
 
     ts = converter.start_timing("Writing ...")
-    converter.write(cfg["event_output"], cfg["metadata_output"], cfg["unique_events_output"])
+    converter.write(files_dir)
     converter.end_timing(ts)
-
-    cfg["event_output"].close()
-    cfg["metadata_output"].close()
 
     end = time.perf_counter()
     tot = end - begin
