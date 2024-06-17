@@ -1,10 +1,11 @@
 'use client'
 import React, { useState, useEffect } from 'react';
 import NavBar from "@/app/ui/components/NavBar";
-import {Tabs, Tab, Card, CardBody} from "@nextui-org/react";
+import { Button } from "@nextui-org/react";
+import { Tabs, Tab, Card, CardBody } from "@nextui-org/react";
 import { Divider, Spacer } from "@nextui-org/react";
 import { Select, SelectItem, Checkbox } from "@nextui-org/react";
-import { RadioGroup, Radio } from "@nextui-org/react";
+import { RadioGroup, Radio, Input } from "@nextui-org/react";
 import GlobalIndentedTree from "@/app/ui/components/viz/GlobalIndentedTree";
 import LogicalSunBurst from "@/app/ui/components/viz/LogicalSunBurst";
 import SpaceTime from "@/app/ui/components/viz/SpaceTime";
@@ -19,12 +20,18 @@ interface Plot {
 }
 
 let known_ranks : string[] = []
+let rank_range : string = ""
+let rank_range_error : string = ""
 let known_depths = [1]
 let maximum_depth = 1
 
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
     const [selectedRank, setSelectedRank] = useState<string | "all">("all");
+    const [inputValue, setInputValue] = useState("");
+    const [invalidRank, setInvalidRank] = useState(false);
+    const [specifyRank, setSpecifyRank] = useState<boolean | false>(false);
+    const [changedInput, setChangedInput] = useState(false);
     const [selectedDepth, setSelectedDepth] = useState<number | 5>(5);
     const [isIndentedTreeSelected, setIsIndentedTreeSelected] = useState(false);
     const [plotData, setPlotData] = useState<any>({});
@@ -40,11 +47,46 @@ export default function Page() {
         { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/all' } },
         ]);
 
-    const handleRankChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleRadioChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const rank = event.target.value;
-        setSelectedRank(rank);
-        updateAllEndpoints(selectedDepth, rank);
+        setInvalidRank(false);
+        // if (rank != "select") {
+        if (rank == "all") {
+            setSpecifyRank(false);
+            setSelectedRank(rank);
+            updateAllEndpoints(selectedDepth, rank);
+        } else if (rank == "avg") { // temporary, until representative rank works
+            setSpecifyRank(false);
+            setSelectedRank("all");
+            updateAllEndpoints(selectedDepth, "all");
+        } else {
+            setSpecifyRank(true);
+            setSelectedRank("");
+            if (inputValue != "") {
+                setSelectedRank(inputValue);
+                updateAllEndpoints(selectedDepth, inputValue);
+            }
+        }
     };
+
+    const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setInvalidRank(false);
+        setSelectedRank(event.target.value);
+        if (event.target.value != "") {
+            setChangedInput(true);
+        }
+    };
+
+    const handleInputSubmission = () => {
+        if (known_ranks.includes(selectedRank.toString())) {
+            setInputValue(selectedRank);
+            setInvalidRank(false);
+            updateAllEndpoints(selectedDepth, selectedRank);
+        } else {
+            setInvalidRank(true);
+        }
+        setChangedInput(false);
+    }
 
     const handleMaxDepthChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const initial_depth = parseInt(event.target.value, 10);
@@ -65,7 +107,6 @@ export default function Page() {
                 }
             };
         }));
-        console.log(plots)
     };
 
     useEffect(() => {
@@ -80,9 +121,12 @@ export default function Page() {
                 dataMap[res.key] = res.data;
             });
             setPlotData(dataMap);
-            known_ranks = dataMap['summaryTable']['known.ranks'].sort()
+            known_ranks = dataMap['summaryTable']['known.ranks'].map(String).sort()
             known_depths = dataMap['summaryTable']['known.depths'].sort()
             maximum_depth = dataMap['summaryTable']['maximum.depth']
+
+            rank_range = `Enter a rank in range ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
+            rank_range_error = `Rank not found in range ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
         }
         fetchData();
     }, [plots]);
@@ -123,21 +167,59 @@ export default function Page() {
                             <Card>
                                 <Spacer y={5} />
                                 <RadioGroup
-                                    label="Select rank"
+                                    label="Select Rank View"
+                                    defaultValue={specifyRank ? "select" : selectedRank}
                                     orientation="horizontal"
-                                    defaultValue={selectedRank}
-                                    onChange={handleRankChange}
+                                    value={specifyRank ? "select" : selectedRank}
+                                    onChange={handleRadioChange}
                                     style={{ marginLeft: '15px' }}
                                 >
-                                    {known_ranks.map(rank => (
-                                        <Radio key={rank.toString()} value={rank.toString()}>
-                                            {rank.toString()}
-                                        </Radio>
-                                    ))}
                                     <Radio key="all" value="all">
                                         All
                                     </Radio>
+                                    <Radio key="avg" value="avg">
+                                        Average
+                                    </Radio>
+                                    <Radio key="select" value="select">
+                                        Enter Rank
+                                    </Radio>
                                 </RadioGroup>
+                                <Spacer y={5}/>
+                                <div style={{ display: 'flex', alignItems: 'left'}}>
+                                    <Spacer x={3.5}/>
+                                    <Input
+                                        style={{ marginLeft: '15px' }}
+                                        type="text"
+                                        isClearable={specifyRank}
+                                        placeholder={specifyRank ? rank_range : inputValue}
+                                        isDisabled={!specifyRank}
+                                        defaultValue={specifyRank ? selectedRank : inputValue}
+                                        value={specifyRank ? selectedRank : ""}
+                                        isInvalid={invalidRank}
+                                        errorMessage={rank_range_error}
+                                        onClear={() => {
+                                            setSelectedRank("");
+                                            setInputValue("");
+                                            setInvalidRank(false);
+                                            setChangedInput(false);
+                                        }}
+                                        onChange={handleInputChange}
+                                        startContent={
+                                            <div className="pointer-events-none flex items-center">
+                                                <span className="text-default-400 text-small"> </span>
+                                            </div>
+                                        }>
+                                    </Input>
+                                    <Spacer x={1}/>
+                                    <Button
+                                        color="default"
+                                        onPress={handleInputSubmission}
+                                        onKeyDown={handleInputSubmission}
+                                        isDisabled={!changedInput}>
+                                            Submit
+                                    </Button>
+                                    <Spacer x={12}/>
+                                </div>
                                 <Spacer y={5}/>
                                 <Select
                                     style={{ marginLeft: '15px' }}
