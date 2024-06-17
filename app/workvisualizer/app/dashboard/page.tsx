@@ -125,7 +125,7 @@ export default function Page() {
             known_depths = dataMap['summaryTable']['known.depths'].sort()
             maximum_depth = dataMap['summaryTable']['maximum.depth']
 
-            rank_range = `Enter a rank in range ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
+            rank_range = `Enter a rank ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
             rank_range_error = `Rank not found in range ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
         }
         fetchData();
@@ -189,7 +189,7 @@ export default function Page() {
                                     <Spacer x={3.5}/>
                                     <Input
                                         style={{ marginLeft: '15px' }}
-                                        type="text"
+                                        type="number"
                                         isClearable={specifyRank}
                                         placeholder={specifyRank ? rank_range : inputValue}
                                         isDisabled={!specifyRank}
