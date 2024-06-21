@@ -92,7 +92,7 @@ plt.show()
 #################################################################################
 
 ## once we've found the frequency, use STUMPY to find motifs
-peak_T = 1./43.
+peak_T = 0.6
 window_size = int(sr * peak_T)
 print(f"sr: {sr}, peak_T: {peak_T}")
 print(f"Using window_size: {window_size}")

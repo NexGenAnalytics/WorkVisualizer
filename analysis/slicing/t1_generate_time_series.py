@@ -108,36 +108,36 @@ def create_events_data(num_loops=100, anomaly=False):
     return events_list, typical_loop_time
 
 def create_time_series(num_samples=10000, num_loops=100, anomaly=False):
-    events, typical_loop_time = create_events_data(num_loops)
+    events, typical_loop_time = create_events_data(num_loops, anomaly=anomaly)
 
     events_file = "/home/calebschilly/Develop/WorkVisualizer/WorkVisualizer/app/workvisualizer/api/files/events/events-0-depth_5.json"
     with open(events_file, 'r') as f:
         events = json.load(f)
 
     time_range = (events[0]["ts"], events[-1]["ts"] + events[-1]["dur"])
-    time_steps = np.linspace(time_range[0], time_range[1], num_samples)
+    bins = np.linspace(time_range[0], time_range[1], num_samples)
 
-    call_data = np.zeros_like(time_steps)
+    call_data = np.zeros_like(bins)
 
-    for i in range(len(time_steps) - 1):
-        step = time_steps[i]
-        next_step = time_steps[i+1]
+    for i in range(len(bins) - 1):
+        bin_start = bins[i]
+        bin_end = bins[i+1]
         for event in events:
-            if step < event["ts"] <= next_step or step < event["ts"] + event["dur"] <= next_step:
+            if bin_start <= event["ts"] <= bin_end or event["ts"] <= bin_start <= event["ts"] + event["dur"]:
                 call_data[i] += 1
 
-    filtered_steps = time_steps[5000:5000+230]
+    filtered_bins = bins[5000:5000+230]
     filtered_data = call_data[5000:5000+230]
 
     plt.figure()
-    plt.plot(time_steps, call_data)
+    plt.plot(bins, call_data)
     plt.title("Time Series Representation")
-    plt.xlabel("Time Steps (s)")
+    plt.xlabel("Bins (s)")
     plt.ylabel("Number of Calls Occurring in Step")
     # plt.plot(filtered_steps, filtered_data, c="r")
     plt.show()
 
-    return (time_steps, call_data, typical_loop_time)
+    return (bins, call_data, typical_loop_time)
 
 def main():
     time_series = create_time_series(num_loops=10)

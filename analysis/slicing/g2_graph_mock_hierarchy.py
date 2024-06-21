@@ -19,7 +19,7 @@ def build_graph(data, graph, node_sizes, parent=None, node_counter=[0]):
     node_counter[0] += 1
 
     # Define node label from path and name, standardize size
-    node_label = data["name"]
+    node_label = data["name"].replace(":", "/")
     node_sizes.append(2000)
 
     # Add node to the graph
@@ -30,12 +30,13 @@ def build_graph(data, graph, node_sizes, parent=None, node_counter=[0]):
         graph.add_edge(parent, node_id)
 
     # Recurse for children
-    for child in data.get('children', []):
+    for child in data.get("children", []):
         build_graph(child, graph, node_sizes, parent=node_id, node_counter=node_counter)
 
 
 def generate_graph(slicing_dir="/home/calebschilly/Develop/WorkVisualizer/WorkVisualizer/analysis/slicing"):
     # Create files
+    # hierarchy_file = "/home/calebschilly/Develop/WorkVisualizer/WorkVisualizer/app/workvisualizer/api/files/logical_hierarchy/logical_hierarchy_rank_all_root_root_depth_5.json"
     hierarchy_file = os.path.join(slicing_dir, "mock_hierarchy.json")
     output_file = os.path.join(slicing_dir, "mock_graph.png")
 
