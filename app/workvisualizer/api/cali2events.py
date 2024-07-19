@@ -572,7 +572,7 @@ class CaliTraceEventConverter:
             trec.update(sf=sf)
 
 
-def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit: int = 5, write=True):
+def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit: int = 5):
 
     cfg = {
         "pretty_print": True,
@@ -596,10 +596,19 @@ def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit:
         converter.sync_timestamps()
         converter.end_timing(ts)
 
-    if write:
-        ts = converter.start_timing("Writing ...")
-        converter.write(files_dir)
-        converter.end_timing(ts)
+    ts = converter.start_timing("Writing ...")
+
+    events_dir = os.path.join(files_dir, "events")
+    os.makedirs(events_dir, exist_ok=True)
+
+    unique_dir = os.path.join(files_dir, "unique-events")
+    os.makedirs(unique_dir, exist_ok=True)
+
+    metadata_dir = os.path.join(files_dir, "metadata")
+    os.makedirs(metadata_dir, exist_ok=True)
+
+    converter.write(files_dir)
+    converter.end_timing(ts)
 
     end = time.perf_counter()
     tot = end - begin
