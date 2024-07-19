@@ -3,3 +3,4 @@ data
 misc/plots
 misc/hierarchies
 app/workvisualizer/api/files/*
+!app/workvisualizer/tests/data
