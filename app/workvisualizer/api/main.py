@@ -35,6 +35,8 @@
 import json
 import os
 import sys
+
+import numpy as np
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -45,6 +47,8 @@ import subprocess
 from cali2events import convert_cali_to_json
 from events2hierarchy import events_to_hierarchy
 from logical_hierarchy import generate_logical_hierarchy_from_root
+import representativeRank
+import re
 
 app = FastAPI()
 
@@ -58,6 +62,7 @@ app.add_middleware(
 
 files_dir = os.path.join(os.getcwd(), "files")
 
+
 # Simple helper function
 def get_data_from_json(filepath):
     assert os.path.isfile(filepath), f"No file found at {filepath}"
@@ -67,6 +72,7 @@ def get_data_from_json(filepath):
     except FileNotFoundError as e:
         sys.exit(f"Could not find {filepath}")
 
+
 def remove_existing_files(directory):
     for item in os.listdir(directory):
         full_path = os.path.join(directory, item)
@@ -74,6 +80,7 @@ def remove_existing_files(directory):
             os.remove(full_path)
         elif os.path.isdir(full_path):
             remove_existing_files(full_path)
+
 
 def unpack_cali(maximum_depth_limit=None):
     cali_dir = os.path.join(files_dir, "cali")
@@ -83,6 +90,7 @@ def unpack_cali(maximum_depth_limit=None):
         return {"message": "No input .cali file was found."}
 
     convert_cali_to_json(input_files, files_dir, maximum_depth_limit)
+
 
 @app.post("/api/upload")
 async def upload_cali_files(files: list[UploadFile] = File(...)):
@@ -106,6 +114,7 @@ async def upload_cali_files(files: list[UploadFile] = File(...)):
 
     return {"message": "Successfully uploaded files."}
 
+
 # This endpoint doesn't use the rank at all for now
 @app.get("/api/metadata/{depth}/{rank}")
 def get_metadata(depth, rank):
@@ -119,6 +128,7 @@ def get_metadata(depth, rank):
         unpack_cali(maximum_depth_limit=depth)
 
     return get_data_from_json(filepath)
+
 
 @app.get("/api/spacetime/{depth}/{rank}")
 def get_spacetime_data(depth, rank):
@@ -148,6 +158,7 @@ def get_spacetime_data(depth, rank):
     # TODO: Add check for rank
 
     return get_data_from_json(filepath)
+
 
 # @app.get("/api/hierarchy/{rank}")
 # def get_hierarchy_data(rank):
@@ -185,6 +196,7 @@ def get_logical_hierarchy_data(ftn_id, depth, rank):
 
     return get_data_from_json(filepath)
 
+
 @app.get("/api/util/vizcomponents")
 def get_available_viz_componenents():
     viz_components_dir = os.path.join(os.getcwd(), '..', 'app', 'ui', 'components', 'viz')
@@ -194,6 +206,70 @@ def get_available_viz_componenents():
         tsx_files = [file for file in files if file.endswith('.tsx')]
         print(tsx_files)
         return JSONResponse(content={"components": tsx_files})
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/analysis/representativerank")
+def get_representative_rank():
+    # this is quite barebones; this will need to handle depth selection,
+    # and function type selection (ie cluster based on kokkos, mpi, user, etc. functions)
+
+    try:
+        events_dir = os.path.join(files_dir, "events")
+        files = os.listdir(events_dir)
+        abs_files = [os.path.abspath(os.path.join(events_dir, file)) for file in files]
+        print(f"files: {files}")
+        unique_function_names = representativeRank.get_unique_function_names(abs_files)
+        print(unique_function_names)
+
+        def extract_rank(s):
+            match = re.search(r'events-(\d+)-depth', s)
+            if match:
+                return int(match.group(1))
+            return None
+
+        ranks = [extract_rank(filename) for filename in files]
+        print(f"ranks: {ranks}")
+        file_name_template = str(
+            os.path.abspath(os.path.join(events_dir, "events-{}-depth_5.json")))  # @todo fix this hardcoded depth
+        feature_df = representativeRank.create_feature_dataframe(
+            file_name_template=file_name_template,
+            ranks=ranks,
+            function_names=unique_function_names
+        )
+        print(feature_df)
+        scaled_df = representativeRank.scale_dataframe(feature_df)
+        print(scaled_df)
+        data_scaled_pca_df, loadings_df = representativeRank.apply_pca(scaled_df)
+        print(data_scaled_pca_df)
+        print(loadings_df)
+        kmeans, n_clusters, df = representativeRank.apply_kmeans(data_scaled_pca_df, len(ranks))
+        print(kmeans)
+        print(f"There are {n_clusters} clusters")
+        print(df)
+        # get number of points per cluster
+        representative_ranks = representativeRank.get_representative_ranks_of_clusters(df, kmeans, ranks)
+        print(representative_ranks)
+        for cluster in np.unique(kmeans.labels_):
+            print(f"Cluster {cluster} has {len(df[df['cluster'] == cluster])} points")
+        res = [
+            {
+                "cluster": cluster,
+                "representative rank": representative_ranks[f"cluster {cluster}"],
+                "n_ranks": len(df[df['cluster'] == cluster])
+            } for cluster in np.unique(kmeans.labels_)]
+
+        print(res)
+        max_ranks_per_cluster = 0
+        representative_rank = 0
+        for cluster in res:
+            if cluster['n_ranks'] > max_ranks_per_cluster:
+                max_ranks_per_cluster = cluster['n_ranks']
+                representative_rank = cluster['representative rank']
+
+        return JSONResponse(content={'representative rank': representative_rank})
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
