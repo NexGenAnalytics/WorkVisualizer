@@ -84,5 +84,8 @@ def generate_logical_hierarchy_from_root(events_file, output_file, ftn_id: int =
     hierarchy_generator = LogicalHierarchy(events_file, ftn_id)
     hierarchy = hierarchy_generator.create_hierarchy()
 
+    logical_dir = os.path.dirname(output_file)
+    os.makedirs(logical_dir, exist_ok=True)
+
     with open(output_file, "w") as out_json:
         json.dump(hierarchy, out_json, indent=1)

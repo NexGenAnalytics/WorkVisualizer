@@ -43,16 +43,6 @@ def remove_existing_files(directory):
 
 def unpack_cali(maximum_depth_limit=None):
     cali_dir = os.path.join(files_dir, "cali")
-
-    events_dir = os.path.join(files_dir, "events")
-    os.makedirs(events_dir, exist_ok=True)
-
-    unique_dir = os.path.join(files_dir, "unique-events")
-    os.makedirs(unique_dir, exist_ok=True)
-
-    metadata_dir = os.path.join(files_dir, "metadata")
-    os.makedirs(metadata_dir, exist_ok=True)
-
     input_files = [os.path.join(cali_dir, filename) for filename in os.listdir(cali_dir) if filename.endswith(".cali")]
 
     if len(input_files) == 0:
@@ -144,7 +134,6 @@ def get_logical_hierarchy_data(ftn_id, depth, rank):
     unique_dir = os.path.join(files_dir, "unique-events")
 
     logical_dir = os.path.join(files_dir, "logical_hierarchy")
-    os.makedirs(logical_dir, exist_ok=True)
 
     root_desc = "root" if ftn_id == "-1" else f"root_{ftn_id}"
     depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
@@ -158,7 +147,7 @@ def get_logical_hierarchy_data(ftn_id, depth, rank):
             unpack_cali(maximum_depth_limit=depth)
 
         # TODO: Add check for rank
-        generate_logical_hierarchy_from_root(unique_events_file, os.path.join(filepath), ftn_id=int(ftn_id))
+        generate_logical_hierarchy_from_root(unique_events_file, filepath, ftn_id=int(ftn_id))
 
     return get_data_from_json(filepath)
 

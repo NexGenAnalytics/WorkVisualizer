@@ -1,0 +1,44 @@
+name: Install and test WorkVisualizer
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+
+concurrency:
+  group: ${{ github.event.repository.name }}-${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: True
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false # true -> cancel all jobs if any fails
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip list
+          pip install -r app/workvisualizer/requirements.txt
+
+      - name: Run tests
+        run: |
+          pytest
