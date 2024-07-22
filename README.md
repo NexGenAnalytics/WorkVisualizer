@@ -22,12 +22,22 @@ These instructions explain how to generate a data dump for any given application
 
 The steps assume that the top-level of the Work Visualizer repository has been exported to `$WORKVIZ_DIR`.
 
-1. Install [Caliper](https://github.com/LLNL/Caliper)
+1. Install [Caliper](https://github.com/LLNL/Caliper) with the following configuration (where `${CALIPER_SOURCE_DIR}` and `${CALIPER_INSTALL_DIR}` must be exported beforehand, or filled in manually):
+```cmake
+cmake -D BUILD_TESTING=Off \
+      -D WITH_MPI=On \
+      -D WITH_TOOLS=Off \
+      -D CMAKE_BUILD_TYPE=Debug \
+      -D CMAKE_INSTALL_PREFIX="${CALIPER_INSTALL_DIR}"\
+      "${CALIPER_SOURCE_DIR}"
+```
+
 _Note: At least for the moment, Caliper must be installed in Debug mode._
+
 
 2. Export the following environment variables
 
-```
+```sh
 export KOKKOS_TOOLS_LIBS=/path/to/libcaliper.so
 export CALI_CONFIG_FILE=${WORKVIZ_DIR}/caliper.config
 ```
