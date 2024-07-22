@@ -32,7 +32,8 @@
 #
 # ************************************************************************
 #
-#!/usr/bin/env python3
+
+# This file was modified by NGA from a source file in the Caliper repo (license below):
 
 # Copyright (c) 2022, Lawrence Livermore National Security, LLC.
 # See top-level LICENSE file for details.
@@ -70,8 +71,6 @@
 # Convert a .cali trace to Google TraceEvent JSON
 
 ###################################################################################
-
-# Note: The original script has been edited
 
 import json
 import numpy as np
