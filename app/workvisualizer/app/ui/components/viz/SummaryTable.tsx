@@ -74,14 +74,6 @@ export default function SummaryTable({ data }) {
                 <TableCell>{data["mpi.world.size"]}</TableCell>
               </TableRow>
               <TableRow key="2">
-                <TableCell>Received Ranks</TableCell>
-                <TableCell>
-                  {data["known.ranks"].length > 4
-                    ? `${data["known.ranks"].sort()[0]} - ${data["known.ranks"].sort()[data["known.ranks"].length - 1]}`
-                    : data["known.ranks"].sort().join(", ")}
-                </TableCell>
-              </TableRow>
-              <TableRow key="3">
                 <TableCell>Program Runtime</TableCell>
                 <TableCell>{formatTime(data["program.runtime"])} s</TableCell>
               </TableRow>

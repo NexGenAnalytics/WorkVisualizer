@@ -25,12 +25,15 @@ let rank_range_error : string = ""
 let known_depths = [1]
 let maximum_depth = 1
 
+// This should be updated with the new endpoint
+let representativeRank = "0"
+
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
-    const [selectedRank, setSelectedRank] = useState<string | "all">("all");
+    const [selectedRank, setSelectedRank] = useState<string | "0">("0");
     const [inputValue, setInputValue] = useState("");
     const [invalidRank, setInvalidRank] = useState(false);
-    const [specifyRank, setSpecifyRank] = useState<boolean | false>(false);
+    const [specifyRank, setSpecifyRank] = useState<boolean | true>(true);
     const [changedInput, setChangedInput] = useState(false);
     const [selectedDepth, setSelectedDepth] = useState<number | 5>(5);
     const [isIndentedTreeSelected, setIsIndentedTreeSelected] = useState(false);
@@ -41,24 +44,19 @@ export default function Page() {
         //      root (only for hierarchies): -1 (shows entire available tree)
         //      depth:                        5 (only parses records with path depth < 5)
         //      rank:                         0 (default to rank 0)
-        { key: 'globalIndentedTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1/5/all' } },
-        { key: 'logicalSunBurst', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1/5/all'} },
-        { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime/5/all'} },
-        { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/all' } },
+        { key: 'globalIndentedTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1/5/0' } },
+        { key: 'logicalSunBurst', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1/5/0'} },
+        { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime/5/0'} },
+        { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/0' } },
         ]);
 
     const handleRadioChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const rank = event.target.value;
         setInvalidRank(false);
-        // if (rank != "select") {
-        if (rank == "all") {
+        if (rank == "rep") {
             setSpecifyRank(false);
             setSelectedRank(rank);
-            updateAllEndpoints(selectedDepth, rank);
-        } else if (rank == "avg") { // temporary, until representative rank works
-            setSpecifyRank(false);
-            setSelectedRank("all");
-            updateAllEndpoints(selectedDepth, "all");
+            updateAllEndpoints(selectedDepth, representativeRank);
         } else {
             setSpecifyRank(true);
             setSelectedRank("");
@@ -174,11 +172,9 @@ export default function Page() {
                                     onChange={handleRadioChange}
                                     style={{ marginLeft: '15px' }}
                                 >
-                                    <Radio key="all" value="all">
-                                        All
-                                    </Radio>
-                                    <Radio key="avg" value="avg">
-                                        Average
+                                    <Radio key="rep" value="rep">
+                                        Representative
+                                        {/* it would be cool to have a small (?) icon that explains what the representative rank is */}
                                     </Radio>
                                     <Radio key="select" value="select">
                                         Enter Rank
