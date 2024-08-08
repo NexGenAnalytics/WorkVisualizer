@@ -278,7 +278,7 @@ export default function Page() {
 
                 </div>
                 <Divider orientation='vertical'/>
-                <div className="flex flex-row p-4 bg-slate-950 h-full overflow-y-auto w-full">
+                <div className="flex flex-row p-4 h-full overflow-y-auto w-full">
                     <div className="overflow-auto">
                         {isIndentedTreeSelected && plotData['globalIndentedTree'] ? <GlobalIndentedTree data={plotData['globalIndentedTree']} /> : null}
                     </div>

@@ -2,8 +2,9 @@
 // FileUploadButton.tsx
 import { Button } from '@nextui-org/react';
 import axios from 'axios';
-import { useRef } from 'react';
+import React, {useRef, useState} from 'react';
 import { useRouter } from 'next/navigation';
+import { CircularProgress } from '@nextui-org/react';
 
 interface FileUploadButtonProps {
     redirectOnSuccess?: string;
@@ -12,12 +13,14 @@ interface FileUploadButtonProps {
 const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const router = useRouter();
+    const [isLoading, setIsLoading] = useState(false);
 
     const handleButtonClick = () => {
         inputRef.current?.click();
     };
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        setIsLoading(true);
         const files = event.target.files;
         if (files && files.length > 0) {
             const formData = new FormData();
@@ -32,11 +35,13 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
                     },
                 });
                 console.log('File uploaded successfully');
+                setIsLoading(false);
                 if (redirectOnSuccess) {
                     router.push(redirectOnSuccess);
                 }
             } catch (error) {
                 console.error('Error uploading file', error);
+                setIsLoading(false);
             }
         }
     };
@@ -50,12 +55,16 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
                 className="hidden"
                 accept=".cali" // Specify file types
             />
-            <Button
-                color="primary"
-                onClick={handleButtonClick}
-            >
-                Upload File(s)
-            </Button>
+            {isLoading ?
+                <CircularProgress size="lg" aria-label="Loading..."/>
+                :
+                <Button
+                    color="primary"
+                    onClick={handleButtonClick}
+                >
+                    Upload File(s)
+                </Button>
+            }
         </div>
     );
 };
