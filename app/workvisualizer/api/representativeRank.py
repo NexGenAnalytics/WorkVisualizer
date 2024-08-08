@@ -66,7 +66,7 @@ def create_feature_dataframe(
     df.index.name = 'rank'
 
     for rank in ranks:
-        print(file_name_template)
+        # print(file_name_template)
         rank_data = get_data_from_json(file_name_template.format(rank))
         for function_name in function_names:
             # print(f'  - Looking at function {function_name}')
@@ -134,14 +134,21 @@ def apply_kmeans(
 ):
     silhouette = []
     # @todo: add more logic here to avoid doing too much kmeans for large numbers of ranks
-    for n_clusters in range(2, n_ranks):
+    for n_clusters in range(2, 5):
         kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(df)
-        silhouette.append(silhouette_score(df, kmeans.labels_))
-    # @todo: if silhouette score is bad in all cases, default to 1 cluster
-    # get number of clusters that maximizes the silhouette score
-    n_clusters = np.argmax(silhouette) + 2  # +2 because the first number of clusters we test is 2
-    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(df)
-    df['cluster'] = kmeans.labels_
+        score = silhouette_score(df, kmeans.labels_)
+        print(f'  KMeans: {n_clusters} clusters -> silhouette score: {score}')
+        silhouette.append(score)
+    if np.max(silhouette) < 0.5:
+        print(f"Silhouette scores are low: {silhouette}")
+        n_clusters = 1
+        kmeans = None
+        df = df.assign(cluster=0)
+    else:
+        # get number of clusters that maximizes the silhouette score
+        n_clusters = np.argmax(silhouette) + 2  # +2 because the first number of clusters we test is 2
+        kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(df)
+        df['cluster'] = kmeans.labels_
     return kmeans, n_clusters, df
 
 
@@ -151,34 +158,34 @@ def get_representative_ranks_of_clusters(
         ranks: list[int]
 ):
     centroids = kmeans.cluster_centers_
-    print(centroids)
+    # print(centroids)
     representative_ranks = {}
     n_pca_components = len(df.columns) - 2
-    print(n_pca_components)
-    print(df)
+    # print(n_pca_components)
+    # print(df)
     for cluster, cluster_centroid in enumerate(centroids):
-        print(f"Looking at cluster {cluster}")
-        print(f"cluster centroid: {cluster_centroid}")
+        # print(f"Looking at cluster {cluster}")
+        # print(f"cluster centroid: {cluster_centroid}")
         # get ranks in this cluster
         cluster_ranks = df[df['cluster'] == cluster]
-        print(f"cluster ranks: {cluster_ranks}")
+        # print(f"cluster ranks: {cluster_ranks}")
         distances = []
         # get distance from each rank to the centroid
         for rank in cluster_ranks.index:
-            print(f"  - Looking at rank {rank}")
+            # print(f"  - Looking at rank {rank}")
             rank_data = df.loc[f'{rank}', :].to_numpy()
             # drop the cluster column
             rank_data = rank_data[:-1]
-            print(f"    rank data: {rank_data}")
+            # print(f"    rank data: {rank_data}")
             distance = np.linalg.norm(rank_data - cluster_centroid)
-            print(f"    distance: {distance}")
+            # print(f"    distance: {distance}")
             distances.append(distance)
         print(distances)
         # get rank with minimum distance
         min_distance_index = np.argmin(distances)
-        print(min_distance_index)
-        print(cluster_ranks.index)
-        print(cluster_ranks.index[min_distance_index])
+        # print(min_distance_index)
+        # print(cluster_ranks.index)
+        # print(cluster_ranks.index[min_distance_index])
         representative_ranks[f"cluster {cluster}"] = cluster_ranks.index[min_distance_index]
 
     return representative_ranks

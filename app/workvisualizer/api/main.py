@@ -213,39 +213,54 @@ def get_available_viz_componenents():
 
 @app.get("/api/analysis/representativerank")
 def get_representative_rank():
-    # this is quite barebones; this will need to handle depth selection,
-    # and function type selection (ie cluster based on kokkos, mpi, user, etc. functions)
-
     try:
-        events_dir = os.path.join(files_dir, "events")
-        files = os.listdir(events_dir)
-        abs_files = [os.path.abspath(os.path.join(events_dir, file)) for file in files]
-        print(f"files: {files}")
-        unique_function_names = representativeRank.get_unique_function_names(abs_files)
-        print(unique_function_names)
+        # this is quite barebones; this will need to handle depth selection,
+        # and function type selection (ie cluster based on kokkos, mpi, user, etc. functions)
+        analysis_dir = os.path.join(files_dir, "analysis")
 
-        def extract_rank(s):
-            match = re.search(r'events-(\d+)-depth', s)
-            if match:
-                return int(match.group(1))
-            return None
+        filename = f"representative_rank.json"
+        filepath = os.path.join(analysis_dir, filename)
 
-        ranks = [extract_rank(filename) for filename in files]
-        print(f"ranks: {ranks}")
-        file_name_template = str(
-            os.path.abspath(os.path.join(events_dir, "events-{}-depth_5.json")))  # @todo fix this hardcoded depth
-        feature_df = representativeRank.create_feature_dataframe(
-            file_name_template=file_name_template,
-            ranks=ranks,
-            function_names=unique_function_names
-        )
-        print(feature_df)
-        scaled_df = representativeRank.scale_dataframe(feature_df)
-        print(scaled_df)
-        data_scaled_pca_df, loadings_df = representativeRank.apply_pca(scaled_df)
-        print(data_scaled_pca_df)
-        print(loadings_df)
-        kmeans, n_clusters, df = representativeRank.apply_kmeans(data_scaled_pca_df, len(ranks))
+        if not os.path.isfile(filepath):
+            analyze_representative_rank()
+
+        return get_data_from_json(filepath)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def analyze_representative_rank():
+    events_dir = os.path.join(files_dir, "events")
+    files = os.listdir(events_dir)
+    abs_files = [os.path.abspath(os.path.join(events_dir, file)) for file in files]
+    print(f"files: {files}")
+    unique_function_names = representativeRank.get_unique_function_names(abs_files)
+    print(unique_function_names)
+
+    def extract_rank(s):
+        match = re.search(r'events-(\d+)-depth', s)
+        if match:
+            return int(match.group(1))
+        return None
+
+    ranks = [extract_rank(filename) for filename in files]
+    print(f"ranks: {ranks}")
+    file_name_template = str(
+        os.path.abspath(os.path.join(events_dir, "events-{}-depth_5.json")))  # @todo fix this hardcoded depth
+    feature_df = representativeRank.create_feature_dataframe(
+        file_name_template=file_name_template,
+        ranks=ranks,
+        function_names=unique_function_names
+    )
+    print(feature_df)
+    scaled_df = representativeRank.scale_dataframe(feature_df)
+    print(scaled_df)
+    data_scaled_pca_df, loadings_df = representativeRank.apply_pca(scaled_df)
+    print(data_scaled_pca_df)
+    print(loadings_df)
+    kmeans, n_clusters, df = representativeRank.apply_kmeans(data_scaled_pca_df, len(ranks))
+    if kmeans is None and n_clusters == 1:
+        json_response = {'representative rank': ranks[0]}
+    else:
         print(kmeans)
         print(f"There are {n_clusters} clusters")
         print(df)
@@ -269,7 +284,12 @@ def get_representative_rank():
                 max_ranks_per_cluster = cluster['n_ranks']
                 representative_rank = cluster['representative rank']
 
-        return JSONResponse(content={'representative rank': representative_rank})
+        json_response = {'representative rank': representative_rank}
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    analysis_dir = os.path.join(files_dir, "analysis")
+    os.makedirs(analysis_dir, exist_ok=True)
+    filename = f"representative_rank.json"
+    filepath = os.path.join(analysis_dir, filename)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(json_response, f, ensure_ascii=False, indent=4)
+
