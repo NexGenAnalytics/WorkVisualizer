@@ -26,7 +26,7 @@ let known_depths = [1]
 let maximum_depth = 1
 
 // This should be updated with the new endpoint
-let representativeRank = "0"
+let representativeRank : string = ""
 
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
@@ -119,9 +119,11 @@ export default function Page() {
                 dataMap[res.key] = res.data;
             });
             setPlotData(dataMap);
-            known_ranks = dataMap['summaryTable']['known.ranks'].map(String).sort()
-            known_depths = dataMap['summaryTable']['known.depths'].sort()
-            maximum_depth = dataMap['summaryTable']['maximum.depth']
+            known_ranks = dataMap['summaryTable']['known.ranks'].map(String).sort();
+            known_depths = dataMap['summaryTable']['known.depths'].sort();
+            maximum_depth = dataMap['summaryTable']['maximum.depth'];
+
+            representativeRank = known_ranks[0];
 
             rank_range = `Enter a rank ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
             rank_range_error = `Rank not found in range ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
