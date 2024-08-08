@@ -11,7 +11,7 @@ export const dataRequirements = {
 const GlobalSunBurst = ({ data }) => {
     const ref = useRef();
     const [visibleTypes, setVisibleTypes] = useState(["collective", "mpi", "kokkos", "other"]);
-    const [showImbalance, setShowImbalance] = useState(true);
+    const [showImbalance, setShowImbalance] = useState(false);
 
     useEffect(() => {
         const svg = d3.select(ref.current);
@@ -172,7 +172,6 @@ const GlobalSunBurst = ({ data }) => {
             </CheckboxGroup>
             <Spacer y={5} />
             <Switch
-                defaultSelected
                 checked={showImbalance}
                 onChange={handleImbalanceToggle}
                 size="sm"
