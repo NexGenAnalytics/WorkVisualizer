@@ -129,7 +129,7 @@ export default function Page() {
                 dataMap[res.key] = res.data;
             });
             setPlotData(dataMap);
-            known_ranks = dataMap['summaryTable']['known.ranks'].map(String).sort();
+            known_ranks = dataMap['summaryTable']['known.ranks'].map(Number).sort((a, b) => a - b);
             known_depths = dataMap['summaryTable']['known.depths'].sort();
             maximum_depth = dataMap['summaryTable']['maximum.depth'];
 
