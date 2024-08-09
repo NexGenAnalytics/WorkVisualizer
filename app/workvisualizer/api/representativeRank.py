@@ -1,7 +1,11 @@
 import json
+import mmap
+
+import orjson
 import os
 import sys
 import numpy as np
+import concurrent.futures
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -11,89 +15,78 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
+from logging_utils import log_timed
 
+
+@log_timed()
 def get_data_from_json(filepath):
     assert os.path.isfile(filepath), f"No file found at {filepath}"
     try:
-        with open(filepath) as f:
-            return json.load(f)
+        with open(filepath, 'r') as f:
+            with mmap.mmap(f.fileno(), length=0, access=mmap.ACCESS_READ) as mm:
+                return orjson.loads(mm.read(mm.size()))
     except FileNotFoundError as e:
         sys.exit(f"Could not find {filepath}")
 
 
-def get_unique_function_names(
-        files: list[str],
-        function_pattern_to_keep: str = None,
-        function_pattern_to_drop: str = None
-):
+def extract_function_names(file):
+    rank_data_df = pd.read_json(file)
+    return np.unique(rank_data_df['name'].to_numpy())
+
+
+@log_timed()
+def get_unique_function_names(files: list[str], function_pattern_to_keep: str = None,
+                              function_pattern_to_drop: str = None):
     function_names = set()
-    for file in files:
-        rank_data_df = pd.read_json(file)
-        rank_function_names = np.unique(rank_data_df['name'].to_numpy())
-        function_names.update(rank_function_names)
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        results = executor.map(extract_function_names, files, chunksize=10)
+        for result in results:
+            function_names.update(result)
 
     if function_pattern_to_keep is not None:
-        function_names = [name for name in function_names if function_pattern_to_keep in name]
+        function_names = {name for name in function_names if function_pattern_to_keep in name}
     if function_pattern_to_drop is not None:
-        function_names = [name for name in function_names if function_pattern_to_drop not in name]
+        function_names = {name for name in function_names if function_pattern_to_drop not in name}
 
-    # remove any empty strings from the list
-    function_names = [name for name in function_names if name]
+    function_names = {name for name in function_names if name}
 
     return function_names
 
 
-def create_feature_dataframe(
-        file_name_template: str,
-        ranks: list[int],
-        function_names: list[str]
-):
-    df = pd.DataFrame(
-        index=[f'rank {rank}' for rank in ranks],
-        columns=[
-            f(function_name) for function_name in function_names for f in (
-                lambda name: f'{name}_duration_min',
-                lambda name: f'{name}_duration_q1',
-                lambda name: f'{name}_duration_q2',
-                lambda name: f'{name}_duration_avg',
-                lambda name: f'{name}_duration_sum',
-                lambda name: f'{name}_duration_q3',
-                lambda name: f'{name}_duration_max',
-                lambda name: f'{name}_n_calls'
-            )
-        ]
-    )
-    df.index.name = 'rank'
+def load_rank_data(file_name_template, rank):
+    return rank, get_data_from_json(file_name_template.format(rank))
 
-    for rank in ranks:
-        # print(file_name_template)
-        rank_data = get_data_from_json(file_name_template.format(rank))
-        for function_name in function_names:
-            # print(f'  - Looking at function {function_name}')
-            function_durations = [event['dur'] for event in rank_data if event['name'] == function_name]
-            # print(f'    Durations: {function_durations}')
-            if len(function_durations) >= 1:
-                df.loc[f'rank {rank}', f'{function_name}_duration_min'] = np.min(function_durations)
-                df.loc[f'rank {rank}', f'{function_name}_duration_q1'] = np.percentile(function_durations, 25)
-                df.loc[f'rank {rank}', f'{function_name}_duration_q2'] = np.percentile(function_durations, 50)
-                df.loc[f'rank {rank}', f'{function_name}_duration_avg'] = np.average(function_durations)
-                df.loc[f'rank {rank}', f'{function_name}_duration_sum'] = np.sum(function_durations)
-                df.loc[f'rank {rank}', f'{function_name}_duration_q3'] = np.percentile(function_durations, 75)
-                df.loc[f'rank {rank}', f'{function_name}_duration_max'] = np.max(function_durations)
-                df.loc[f'rank {rank}', f'{function_name}_n_calls'] = len(function_durations)
-            else:
-                df.loc[f'rank {rank}', f'{function_name}_duration_min'] = 0.
-                df.loc[f'rank {rank}', f'{function_name}_duration_q1'] = 0.
-                df.loc[f'rank {rank}', f'{function_name}_duration_q2'] = 0.
-                df.loc[f'rank {rank}', f'{function_name}_duration_avg'] = 0.
-                df.loc[f'rank {rank}', f'{function_name}_duration_sum'] = 0.
-                df.loc[f'rank {rank}', f'{function_name}_duration_q3'] = 0.
-                df.loc[f'rank {rank}', f'{function_name}_duration_max'] = 0.
-                df.loc[f'rank {rank}', f'{function_name}_n_calls'] = 0
+
+@log_timed()
+def create_feature_dataframe(file_name_template: str, ranks: list[int], function_names: list[str]):
+    columns = [f'{name}_{stat}' for name in function_names for stat in
+               ['duration_min', 'duration_q1', 'duration_q2', 'duration_avg', 'duration_sum', 'duration_q3', 'duration_max', 'n_calls']]
+
+    data = {f'rank {rank}': {col: 0.0 for col in columns} for rank in ranks}
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        rank_data_futures = {executor.submit(load_rank_data, file_name_template, rank): rank for rank in ranks}
+        for future in concurrent.futures.as_completed(rank_data_futures):
+            rank, rank_data = future.result()
+            for function_name in function_names:
+                function_durations = [event['dur'] for event in rank_data if event['name'] == function_name]
+                if function_durations:
+                    data[f'rank {rank}'][f'{function_name}_duration_min'] = np.min(function_durations)
+                    data[f'rank {rank}'][f'{function_name}_duration_q1'] = np.percentile(function_durations, 25)
+                    data[f'rank {rank}'][f'{function_name}_duration_q2'] = np.percentile(function_durations, 50)
+                    data[f'rank {rank}'][f'{function_name}_duration_avg'] = np.average(function_durations)
+                    data[f'rank {rank}'][f'{function_name}_duration_sum'] = np.sum(function_durations)
+                    data[f'rank {rank}'][f'{function_name}_duration_q3'] = np.percentile(function_durations, 75)
+                    data[f'rank {rank}'][f'{function_name}_duration_max'] = np.max(function_durations)
+                    data[f'rank {rank}'][f'{function_name}_n_calls'] = len(function_durations)
+
+    df = pd.DataFrame.from_dict(data, orient='index', columns=columns)
+    df.index.name = 'rank'
 
     return df
 
 
+@log_timed()
 def scale_dataframe(df: pd.DataFrame):
     scaler = StandardScaler()
 
@@ -105,6 +98,7 @@ def scale_dataframe(df: pd.DataFrame):
     return df_scaled
 
 
+@log_timed()
 def apply_pca(df: pd.DataFrame):
     pca = PCA()
     df_scaled_pca = pca.fit_transform(df)
@@ -128,6 +122,7 @@ def apply_pca(df: pd.DataFrame):
     return data_scaled_pca_df, loadings_df
 
 
+@log_timed()
 def apply_kmeans(
         df: pd.DataFrame,
         n_ranks: int
@@ -152,6 +147,7 @@ def apply_kmeans(
     return kmeans, n_clusters, df
 
 
+@log_timed()
 def get_representative_ranks_of_clusters(
         df: pd.DataFrame,
         kmeans: KMeans,

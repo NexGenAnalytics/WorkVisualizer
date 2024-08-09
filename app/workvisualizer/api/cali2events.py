@@ -82,6 +82,8 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(script_dir, 'caliper-reader'))
 import caliperreader
 
+from logging_utils import log_timed
+
 all_collectives = ["MPI_Allgather", "MPI_Allgatherv", "MPI_Allreduce", "MPI_Alltoall",
                    "MPI_Alltoallv", "MPI_Alltoallw", "MPI_Barrier", "MPI_Bcast",
                    "MPI_Gather", "MPI_Gatherv", "MPI_Iallgather", "MPI_Iallreduce",
@@ -231,9 +233,11 @@ class CaliTraceEventConverter:
         self.unique_events_dict = {}
         self.max_depth = 0
 
+    @log_timed()
     def read(self, filename_or_stream):
         self.reader.read(filename_or_stream, self._process_record)
 
+    @log_timed()
     def read_and_sort(self, filename_or_stream):
         trace = []
 
@@ -256,6 +260,7 @@ class CaliTraceEventConverter:
             self._process_record(rec[1])
         self.end_timing(ts)
 
+    @log_timed()
     def write(self, files_dir):
 
         depth_desc = "depth_full" if self.maximum_depth_limit is None else f"depth_{self.maximum_depth_limit}"
@@ -349,6 +354,7 @@ class CaliTraceEventConverter:
 
         self.written += len(self.records) + len(self.samples)
 
+    @log_timed()
     def sync_timestamps(self):
         if len(self.tsync) == 0:
             return
@@ -605,6 +611,7 @@ class CaliTraceEventConverter:
             trec.update(sf=sf)
 
 
+@log_timed()
 def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit: int = 5):
 
     cfg = {
