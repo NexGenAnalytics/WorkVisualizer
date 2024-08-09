@@ -10,6 +10,8 @@ import GlobalIndentedTree from "@/app/ui/components/viz/GlobalIndentedTree";
 import LogicalSunBurst from "@/app/ui/components/viz/LogicalSunBurst";
 import SpaceTime from "@/app/ui/components/viz/SpaceTime";
 import SummaryTable from "@/app/ui/components/viz/SummaryTable";
+import {CircularProgress} from "@nextui-org/react";
+
 
 interface Plot {
     key: string;
@@ -24,9 +26,6 @@ let rank_range : string = ""
 let rank_range_error : string = ""
 let known_depths = [1]
 let maximum_depth = 1
-
-// This should be updated with the new endpoint
-let representativeRank : string = ""
 
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
@@ -49,6 +48,17 @@ export default function Page() {
         { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime/5/0'} },
         { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/0' } },
         ]);
+    const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState(null);
+    const [representativeRank, setRepresentativeRank] = useState("");
+
+    const handleAnalysisButtonClick = async () => {
+        setIsAnalysisRunning(true);
+        const response = await fetch('/api/analysis/representativerank');
+        const data = await response.json();
+        setAnalysisResult(data);
+        setIsAnalysisRunning(false);
+    };
 
     const handleRadioChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const rank = event.target.value;
@@ -119,17 +129,21 @@ export default function Page() {
                 dataMap[res.key] = res.data;
             });
             setPlotData(dataMap);
-            known_ranks = dataMap['summaryTable']['known.ranks'].map(String).sort();
+            known_ranks = dataMap['summaryTable']['known.ranks'].map(Number).sort((a, b) => a - b);
             known_depths = dataMap['summaryTable']['known.depths'].sort();
             maximum_depth = dataMap['summaryTable']['maximum.depth'];
-
-            representativeRank = known_ranks[0];
 
             rank_range = `Enter a rank ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
             rank_range_error = `Rank not found in range ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
         }
         fetchData();
     }, [plots]);
+
+    useEffect(() => {
+        if (analysisResult) {
+            setRepresentativeRank(analysisResult['representative rank']);
+        }
+    }, [analysisResult]);
 
     return (
         <div className='h-screen '>
@@ -238,9 +252,33 @@ export default function Page() {
                             </Card>
                         </Tab>
                     </Tabs>
+                    <Spacer y={2}/>
+                    <Divider orientation='horizontal'/>
+                    <Spacer y={2}/>
+                    {representativeRank ?
+                            <Card>
+                              <CardBody>
+                                <p>Representative rank: {representativeRank}</p>
+                              </CardBody>
+                            </Card>
+                        :
+                        <Button
+                            color="default"
+                            onPress={handleAnalysisButtonClick}
+                            onKeyDown={handleAnalysisButtonClick}
+                            isDisabled={isAnalysisRunning}>
+                            {isAnalysisRunning ?
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <CircularProgress size="sm" aria-label="Loading..."/>
+                                    <span style={{ marginLeft: '10px' }}>Running...</span>
+                                </div>
+                                : 'Run analysis'}
+                        </Button>
+                    }
+
                 </div>
                 <Divider orientation='vertical'/>
-                <div className="flex flex-row p-4 bg-slate-950 h-full overflow-y-auto w-full">
+                <div className="flex flex-row p-4 h-full overflow-y-auto w-full">
                     <div className="overflow-auto">
                         {isIndentedTreeSelected && plotData['globalIndentedTree'] ? <GlobalIndentedTree data={plotData['globalIndentedTree']} /> : null}
                     </div>
