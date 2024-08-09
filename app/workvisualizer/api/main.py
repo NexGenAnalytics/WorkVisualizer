@@ -33,22 +33,23 @@
 # ************************************************************************
 #
 import json
+import mmap
 import os
 import sys
+import re
+import concurrent.futures
 
 import numpy as np
+import orjson
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from typing import List
-from pydantic import BaseModel
-import subprocess
 
 from cali2events import convert_cali_to_json
 from events2hierarchy import events_to_hierarchy
 from logical_hierarchy import generate_logical_hierarchy_from_root
 import representativeRank
-import re
+from logging_utils import log_timed, set_log_level
 
 app = FastAPI()
 
@@ -63,16 +64,31 @@ app.add_middleware(
 files_dir = os.path.join(os.getcwd(), "files")
 
 
+# Endpoint to change the log level dynamically
+@app.get("/set-log-level/{log_level}")
+def set_log_level_endpoint(log_level: str):
+    try:
+        message = set_log_level(log_level)
+        return {"message": message}
+    except ValueError as e:
+        return {"error": str(e)}
+
+
 # Simple helper function
+@log_timed()
 def get_data_from_json(filepath):
     assert os.path.isfile(filepath), f"No file found at {filepath}"
     try:
-        with open(filepath) as f:
-            return json.load(f)
+        with open(filepath, 'r') as f:
+            return orjson.loads(f.read())
+            # for really large files:
+            # with mmap.mmap(f.fileno(), length=0, access=mmap.ACCESS_READ) as mm:
+            #     return orjson.loads(mm.read(mm.size()))
     except FileNotFoundError as e:
         sys.exit(f"Could not find {filepath}")
 
 
+@log_timed()
 def remove_existing_files(directory):
     for item in os.listdir(directory):
         full_path = os.path.join(directory, item)
@@ -82,6 +98,16 @@ def remove_existing_files(directory):
             remove_existing_files(full_path)
 
 
+def chunk_list(lst, chunk_size):
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i:i + chunk_size]
+
+
+def process_chunk(chunk, files_dir, maximum_depth_limit):
+    convert_cali_to_json(chunk, files_dir, maximum_depth_limit)
+
+
+@log_timed()
 def unpack_cali(maximum_depth_limit=None):
     cali_dir = os.path.join(files_dir, "cali")
     input_files = [os.path.join(cali_dir, filename) for filename in os.listdir(cali_dir) if filename.endswith(".cali")]
@@ -89,7 +115,16 @@ def unpack_cali(maximum_depth_limit=None):
     if len(input_files) == 0:
         return {"message": "No input .cali file was found."}
 
-    convert_cali_to_json(input_files, files_dir, maximum_depth_limit)
+    # Determine the number of CPU cores
+    num_cores = os.cpu_count()
+    chunk_size = max(1, len(input_files) // num_cores)  # Adjust chunk size based on the number of CPU cores
+
+    chunks = list(chunk_list(input_files, chunk_size))
+
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = [executor.submit(process_chunk, chunk, files_dir, maximum_depth_limit) for chunk in chunks]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
 
 
 @app.post("/api/upload")
@@ -117,6 +152,7 @@ async def upload_cali_files(files: list[UploadFile] = File(...)):
 
 # This endpoint doesn't use the rank at all for now
 @app.get("/api/metadata/{depth}/{rank}")
+@log_timed()
 def get_metadata(depth, rank):
     metadata_dir = os.path.join(files_dir, "metadata")
 
@@ -131,6 +167,7 @@ def get_metadata(depth, rank):
 
 
 @app.get("/api/spacetime/{depth}/{rank}")
+@log_timed()
 def get_spacetime_data(depth, rank):
     events_dir = os.path.join(files_dir, "events")
     depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
@@ -175,6 +212,7 @@ def get_spacetime_data(depth, rank):
 #     return get_data_from_json(filepath)
 
 @app.get("/api/logical_hierarchy/{ftn_id}/{depth}/{rank}")
+@log_timed()
 def get_logical_hierarchy_data(ftn_id, depth, rank):
     unique_dir = os.path.join(files_dir, "unique-events")
 
@@ -198,6 +236,7 @@ def get_logical_hierarchy_data(ftn_id, depth, rank):
 
 
 @app.get("/api/util/vizcomponents")
+@log_timed()
 def get_available_viz_componenents():
     viz_components_dir = os.path.join(os.getcwd(), '..', 'app', 'ui', 'components', 'viz')
 
@@ -212,6 +251,7 @@ def get_available_viz_componenents():
 
 
 @app.get("/api/analysis/representativerank")
+@log_timed()
 def get_representative_rank():
     try:
         # this is quite barebones; this will need to handle depth selection,
@@ -228,6 +268,8 @@ def get_representative_rank():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@log_timed()
 def analyze_representative_rank():
     events_dir = os.path.join(files_dir, "events")
     files = os.listdir(events_dir)
@@ -292,4 +334,3 @@ def analyze_representative_rank():
     filepath = os.path.join(analysis_dir, filename)
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(json_response, f, ensure_ascii=False, indent=4)
-
