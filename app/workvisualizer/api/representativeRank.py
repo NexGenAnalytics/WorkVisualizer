@@ -1,3 +1,5 @@
+from logging_utils.logging_utils import log_timed
+
 import json
 import mmap
 
@@ -15,7 +17,6 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
-from logging_utils import log_timed
 
 
 @log_timed()

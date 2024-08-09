@@ -39,6 +39,9 @@ jobs:
           pip list
           pip install -r app/workvisualizer/requirements.txt
 
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
+
       - name: Run tests
         run: |
           pytest

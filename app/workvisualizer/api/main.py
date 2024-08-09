@@ -32,6 +32,12 @@
 #
 # ************************************************************************
 #
+from logging_utils.logging_utils import log_timed, set_log_level
+from cali2events import convert_cali_to_json
+from events2hierarchy import events_to_hierarchy
+from logical_hierarchy import generate_logical_hierarchy_from_root
+import representativeRank
+
 import json
 import mmap
 import os
@@ -45,11 +51,6 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from cali2events import convert_cali_to_json
-from events2hierarchy import events_to_hierarchy
-from logical_hierarchy import generate_logical_hierarchy_from_root
-import representativeRank
-from logging_utils import log_timed, set_log_level
 
 app = FastAPI()
 
@@ -316,7 +317,8 @@ def analyze_representative_rank():
                 "cluster": cluster,
                 "representative rank": representative_ranks[f"cluster {cluster}"],
                 "n_ranks": len(df[df['cluster'] == cluster])
-            } for cluster in np.unique(kmeans.labels_)]
+            } for cluster in np.unique(kmeans.labels_)
+        ]
 
         print(res)
         max_ranks_per_cluster = 0
