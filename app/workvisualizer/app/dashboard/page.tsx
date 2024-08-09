@@ -29,7 +29,6 @@ let maximum_depth = 1
 
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
-    const [invalidPlot, setInvalidPlot] = useState(false);
     const [selectedRank, setSelectedRank] = useState("0");
     const [inputValue, setInputValue] = useState("");
     const [invalidRank, setInvalidRank] = useState(false);
@@ -67,10 +66,8 @@ export default function Page() {
         const plotName = e.target.value;
         console.log(plotName);
         if (allSelected && plotName == "spaceTime") {
-            setInvalidPlot(true);
             setSelectedPlot(['']);
         } else {
-            setInvalidPlot(false);
             setSelectedPlot([plotName])
             if (plotName == "logicalSunBurst") {
                 setSunburstSelected(true);
@@ -193,9 +190,9 @@ export default function Page() {
                         variant="bordered"
                         placeholder="Select plots"
                         onChange={handlePlotSelection}
+                        disabledKeys={allSelected ? ["spaceTime"] : []}
                         className="min-w-full pt-4"
-                        isInvalid={invalidPlot ? true : false}
-                        errorMessage={invalidPlot ? "Spacetime diagram is not available for all ranks." : ""}
+                        // errorMessage={invalidPlot ? "Spacetime diagram is not available for all ranks." : ""}
                     >
                         {plots.filter(plot => plot.key !== 'globalIndentedTree' && plot.key !== 'summaryTable').map((plot) => (
                             <SelectItem key={plot.key}>{plot.plot.label}</SelectItem>
