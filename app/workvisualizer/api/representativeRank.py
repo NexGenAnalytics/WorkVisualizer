@@ -23,8 +23,10 @@ def get_data_from_json(filepath):
     assert os.path.isfile(filepath), f"No file found at {filepath}"
     try:
         with open(filepath, 'r') as f:
-            with mmap.mmap(f.fileno(), length=0, access=mmap.ACCESS_READ) as mm:
-                return orjson.loads(mm.read(mm.size()))
+            return orjson.loads(f.read())
+            # for very large files, this is faster than json.load
+            # with mmap.mmap(f.fileno(), length=0, access=mmap.ACCESS_READ) as mm:
+            #     return orjson.loads(mm.read(mm.size()))
     except FileNotFoundError as e:
         sys.exit(f"Could not find {filepath}")
 
