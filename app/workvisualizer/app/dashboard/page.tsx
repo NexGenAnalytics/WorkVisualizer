@@ -86,7 +86,7 @@ export default function Page() {
     };
 
     const handleInputSubmission = () => {
-        if (known_ranks.includes(selectedRank.toString())) {
+        if (known_ranks.includes(selectedRank)) {
             setInputValue(selectedRank);
             setInvalidRank(false);
             updateAllEndpoints(selectedDepth, selectedRank);
@@ -135,6 +135,7 @@ export default function Page() {
 
             rank_range = `Enter a rank ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
             rank_range_error = `Rank not found in range ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
+            known_ranks = known_ranks.map(String);
         }
         fetchData();
     }, [plots]);
