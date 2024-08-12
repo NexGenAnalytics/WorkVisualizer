@@ -1,5 +1,6 @@
 import os
 import json
+import multiprocessing
 
 """Determine imbalance among ranks, assuming that the time slices have been found already."""
 
@@ -31,6 +32,42 @@ def calculate_slice_stats(rank_slices):
         }
     return slice_stats
 
+def process_file(filepath, repr_slice_stats, num_slices, slices, imbalance_threshold):
+    # Read the JSON data
+    with open(filepath) as f:
+        json_data = json.load(f)
+
+    # Get the rank ID
+    rank_id = json_data[0]["rank"]
+
+    # Process the data
+    rank_slices = split_events_into_slices(json_data, slices)
+    slice_stats = calculate_slice_stats(rank_slices)
+
+    imbalanced_slices = {slice_id: [] for slice_id in range(num_slices)}
+
+    # Compare stats to the representative rank at each slice
+    for slice_id in range(num_slices):
+        # Compute imbalances for each slice
+        num_events_imb = (slice_stats[slice_id]["num_events"] / repr_slice_stats[slice_id]["num_events"]) - 1
+
+        type_count_imbs = {}
+        for call_type, count in slice_stats[slice_id]["type counts"].items():
+            type_count_imbs[call_type] = (count / repr_slice_stats[slice_id]["type counts"][call_type]) - 1
+
+        type_time_imbs = {}
+        for call_type, time in slice_stats[slice_id]["type times"].items():
+            type_time_imbs[call_type] = (time / repr_slice_stats[slice_id]["type times"][call_type]) - 1
+
+        # Aggregate for final imbalance score
+        slice_imbalance = num_events_imb + sum(list(type_count_imbs.values())) + sum(list(type_time_imbs.values()))
+
+        # Determine if the current slice is sufficiently imbalanced
+        if slice_imbalance > imbalance_threshold:
+            imbalanced_slices[slice_id].append({rank_id: slice_imbalance})
+
+    return imbalanced_slices
+
 def analyze_slices(events_dir: str, rank: int, slices: list):
     """Find ranks with imbalanced slices, assuming that the events file is sorted by start time."""
     # First, get the stats for the representative rank
@@ -40,48 +77,22 @@ def analyze_slices(events_dir: str, rank: int, slices: list):
     repr_rank_slices = split_events_into_slices(repr_json_data, slices)
     repr_slice_stats = calculate_slice_stats(repr_rank_slices)
 
-    # Then determine the number of slices and set up the imbalanced slices dict
+    # Then determine the number of slices and define the imbalance threshold
     num_slices = len(slices)
+    imbalance_threshold = 3.0
+
+    # Loop through all ranks' events files with multiprocessing
+    with multiprocessing.Pool() as pool:
+        results = pool.starmap(
+            process_file,
+            [(os.path.join(events_dir, filename), repr_slice_stats, num_slices, slices, imbalance_threshold) for filename in os.listdir(events_dir)]
+        )
+
+    # Combine results from all processes
     imbalanced_slices = {slice_id: [] for slice_id in range(num_slices)}
-
-    # Temporarily save all imbalances to get idea for average
-    all_imbalances = []
-
-    # Loop through all ranks' events files
-    for filename in os.listdir(events_dir):
-        filepath = os.path.join(events_dir, filename)
-        with open(filepath) as f:
-            json_data = json.load(f)
-
-        # Get the rank ID
-        rank_id = json_data[0]["rank"]
-
-        rank_slices = split_events_into_slices(json_data, slices)
-        slice_stats = calculate_slice_stats(rank_slices)
-
-        # Compare stats to the representative rank at each slice
-        for slice_id in range(num_slices):
-
-            # Compute imbalances for each slice using (max_time / avg_time) - 1  ===>  (rank_val / repr_val) - 1
-            num_events_imb = (slice_stats[slice_id]["num_events"] / repr_slice_stats[slice_id]["num_events"]) - 1
-
-            type_count_imbs = {}
-            for call_type, count in slice_stats[slice_id]["type counts"].items():
-                type_count_imbs[call_type] = (count / repr_slice_stats[slice_id]["type counts"][call_type]) - 1
-
-            type_time_imbs = {}
-            for call_type, time in slice_stats[slice_id]["type times"].items():
-                type_time_imbs[call_type] = (time / repr_slice_stats[slice_id]["type times"][call_type]) - 1
-
-            # Aggregate for final imbalance score
-            slice_imbalance = num_events_imb + sum(list(type_count_imbs.values())) + sum(list(type_time_imbs.values()))
-
-            # Set some imbalance threshold (arbitrary for now)
-            imbalance_threshold = 3.0
-
-            # Determine if the current slice is sufficiently imbalanced
-            if slice_imbalance > imbalance_threshold:
-                imbalanced_slices[slice_id].append({rank_id: slice_imbalance})
+    for result in results:
+        for slice_id, imbalances in result.items():
+            imbalanced_slices[slice_id].extend(imbalances)
 
     # Output a summary of the imbalance
     print("\n------------ Imbalance Summary ------------")
