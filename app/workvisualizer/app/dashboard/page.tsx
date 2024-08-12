@@ -29,12 +29,14 @@ let maximum_depth = 1
 
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
-    const [selectedRank, setSelectedRank] = useState<string | "0">("0");
+    const [selectedRank, setSelectedRank] = useState("0");
     const [inputValue, setInputValue] = useState("");
     const [invalidRank, setInvalidRank] = useState(false);
     const [specifyRank, setSpecifyRank] = useState<boolean | true>(true);
     const [changedInput, setChangedInput] = useState(false);
-    const [selectedDepth, setSelectedDepth] = useState<number | 5>(5);
+    const [selectedDepth, setSelectedDepth] = useState(5);
+    const [sunburstSelected, setSunburstSelected] = useState(false);
+    const [allSelected, setAllSelected] = useState(false);
     const [isIndentedTreeSelected, setIsIndentedTreeSelected] = useState(false);
     const [plotData, setPlotData] = useState<any>({});
     const [plots, setPlots] = useState<Plot[]>([
@@ -60,16 +62,40 @@ export default function Page() {
         setIsAnalysisRunning(false);
     };
 
+    const handlePlotSelection = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const plotName = e.target.value;
+        console.log(plotName);
+        if (allSelected && plotName == "spaceTime") {
+            setSelectedPlot(['']);
+        } else {
+            setSelectedPlot([plotName])
+            if (plotName == "logicalSunBurst") {
+                setSunburstSelected(true);
+            } else {
+                setSunburstSelected(false);
+            }
+        }
+        console.log(selectedPlot);
+    }
+
     const handleRadioChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const rank = event.target.value;
         setInvalidRank(false);
-        if (rank == "rep") {
+        if (rank == "all") {
             setSpecifyRank(false);
             setSelectedRank(rank);
+            setAllSelected(true);
+            updateAllEndpoints(selectedDepth, rank);
+        }
+        else if (rank == "rep") {
+            setSpecifyRank(false);
+            setSelectedRank(rank);
+            setAllSelected(false);
             updateAllEndpoints(selectedDepth, representativeRank);
         } else {
             setSpecifyRank(true);
             setSelectedRank("");
+            setAllSelected(false);
             if (inputValue != "") {
                 setSelectedRank(inputValue);
                 updateAllEndpoints(selectedDepth, inputValue);
@@ -160,10 +186,13 @@ export default function Page() {
                     </Checkbox>
                     <Select
                         label="Select Plots"
+                        value={selectedPlot}
                         variant="bordered"
                         placeholder="Select plots"
-                        onSelectionChange={(keys) => setSelectedPlot(Array.from(keys))}
+                        onChange={handlePlotSelection}
+                        disabledKeys={allSelected ? ["spaceTime"] : []}
                         className="min-w-full pt-4"
+                        // errorMessage={invalidPlot ? "Spacetime diagram is not available for all ranks." : ""}
                     >
                         {plots.filter(plot => plot.key !== 'globalIndentedTree' && plot.key !== 'summaryTable').map((plot) => (
                             <SelectItem key={plot.key}>{plot.plot.label}</SelectItem>
@@ -189,6 +218,9 @@ export default function Page() {
                                     onChange={handleRadioChange}
                                     style={{ marginLeft: '15px' }}
                                 >
+                                    <Radio key="all" value="all" isDisabled={sunburstSelected ? false : true}>
+                                        All
+                                    </Radio>
                                     <Radio key="rep" value="rep">
                                         Representative
                                         {/* it would be cool to have a small (?) icon that explains what the representative rank is */}
