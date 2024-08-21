@@ -28,6 +28,7 @@ class TestConfig(unittest.TestCase):
         cali_files = [os.path.join(self.cali_dir, filename) for filename in os.listdir(self.cali_dir) if
                       filename.endswith(".cali")]
         convert_cali_to_json(cali_files, self.data_dir, maximum_depth_limit=2)
+        aggregate_metadata(self.data_dir)
 
         # Now we should have three new directories (so four total)
         updated_data_dir_contents = os.listdir(self.data_dir)
