@@ -10,7 +10,7 @@ export const dataRequirements = {
 
 const GlobalSunBurst = ({ data }) => {
     const ref = useRef();
-    const [visibleTypes, setVisibleTypes] = useState(["collective", "mpi", "kokkos", "other"]);
+    const [visibleTypes, setVisibleTypes] = useState(["mpi_collective", "mpi_p2p", "kokkos", "other"]);
     const [showImbalance, setShowImbalance] = useState(false);
 
     useEffect(() => {
@@ -24,7 +24,7 @@ const GlobalSunBurst = ({ data }) => {
 
         // Create the color scale.
         const colorScale = d3.scaleOrdinal()
-            .domain(["collective", "mpi", "kokkos", "other"])
+            .domain(["mpi_collective", "mpi_p2p", "kokkos", "other"])
             .range(["#1f77b4", "#f5a524", "#2ca02c", "#a783c9"]);
 
         // Filter data to include only nodes with visible types
@@ -165,8 +165,8 @@ const GlobalSunBurst = ({ data }) => {
                 defaultValue={visibleTypes}
                 onChange={handleCheckboxChange}
             >
-                <Checkbox color="primary" value="collective">MPI Collective</Checkbox>
-                <Checkbox color="warning" value="mpi">MPI Point-To-Point</Checkbox>
+                <Checkbox color="primary" value="mpi_collective">MPI Collective</Checkbox>
+                <Checkbox color="warning" value="mpi_p2p">MPI Point-To-Point</Checkbox>
                 <Checkbox color="success" value="kokkos">Kokkos</Checkbox>
                 <Checkbox color="secondary" value="other">Application</Checkbox>
             </CheckboxGroup>

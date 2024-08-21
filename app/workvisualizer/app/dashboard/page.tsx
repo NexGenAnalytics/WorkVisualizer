@@ -6,9 +6,9 @@ import { Tabs, Tab, Card, CardBody } from "@nextui-org/react";
 import { Divider, Spacer } from "@nextui-org/react";
 import { Select, SelectItem, Checkbox } from "@nextui-org/react";
 import { RadioGroup, Radio, Input } from "@nextui-org/react";
-import GlobalIndentedTree from "@/app/ui/components/viz/GlobalIndentedTree";
-import LogicalSunBurst from "@/app/ui/components/viz/LogicalSunBurst";
-import SpaceTime from "@/app/ui/components/viz/SpaceTime";
+import CallTree from "@/app/ui/components/viz/CallTree";
+import ProportionAnalyzer from "@/app/ui/components/viz/ProportionAnalyzer";
+import EventsPlot from "@/app/ui/components/viz/EventsPlot";
 import SummaryTable from "@/app/ui/components/viz/SummaryTable";
 import {CircularProgress} from "@nextui-org/react";
 
@@ -28,6 +28,9 @@ let rank_range_error : string = ""
 let known_depths = [1]
 let maximum_depth = 1
 
+let start_time : number;
+let end_time : number;
+
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
     const [selectedRank, setSelectedRank] = useState<string | "0">("0");
@@ -44,9 +47,9 @@ export default function Page() {
         //      root (only for hierarchies): -1 (shows entire available tree)
         //      depth:                        5 (only parses records with path depth < 5)
         //      rank:                         0 (default to rank 0)
-        { key: 'globalIndentedTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1/5/0' } },
-        { key: 'logicalSunBurst', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1/5/0'} },
-        { key: 'spaceTime', plot: { label: 'Space Time', endpoint: '/api/spacetime/5/0'} },
+        { key: 'callTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1/5/0' } },
+        { key: 'proportionAnalyzer', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1/5/0'} },
+        { key: 'eventsPlot', plot: { label: 'Space Time', endpoint: '/api/eventsplot/5/0'} },
         { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/0' } },
         ]);
     const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
@@ -138,6 +141,9 @@ export default function Page() {
             rank_range = `Enter a rank ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
             rank_range_error = `Rank not found in range ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
             known_ranks = tmp_known_ranks.map(String);
+
+            start_time = dataMap['summaryTable']['program.start'];
+            end_time = dataMap['summaryTable']['program.end'];
         }
         fetchData();
     }, [plots]);
@@ -161,7 +167,7 @@ export default function Page() {
                         onSelectionChange={(keys) => setSelectedPlot(Array.from(keys))}
                         className="min-w-full pt-4"
                     >
-                        {plots.filter(plot => plot.key !== 'globalIndentedTree' && plot.key !== 'summaryTable').map((plot) => (
+                        {plots.filter(plot => plot.key !== 'callTree' && plot.key !== 'summaryTable').map((plot) => (
                             <SelectItem key={plot.key}>{plot.plot.label}</SelectItem>
                         ))}
                     </Select>
@@ -277,19 +283,19 @@ export default function Page() {
                 <Divider orientation='vertical'/>
                 <div className="flex flex-row p-4 h-full overflow-y-auto w-full">
                     <div className="overflow-auto">
-                        {isIndentedTreeSelected && plotData['globalIndentedTree'] ? <GlobalIndentedTree data={plotData['globalIndentedTree']} /> : null}
+                        {isIndentedTreeSelected && plotData['callTree'] ? <CallTree data={plotData['callTree']} /> : null}
                     </div>
-                    {isIndentedTreeSelected && plotData['globalIndentedTree'] ? <Spacer x={2}/> : null}
-                    {isIndentedTreeSelected && plotData['globalIndentedTree'] ? <Divider orientation='vertical' /> : null}
+                    {isIndentedTreeSelected && plotData['callTree'] ? <Spacer x={2}/> : null}
+                    {isIndentedTreeSelected && plotData['callTree'] ? <Divider orientation='vertical' /> : null}
                     <Spacer x={2}/>
                     <div className="overflow-auto">
                         <Spacer y={5}/>
                         {selectedPlot.map((key) => {
                             const PlotComponent = {
-                                'logicalSunBurst': LogicalSunBurst,
-                                'spaceTime': SpaceTime,
+                                'proportionAnalyzer': ProportionAnalyzer,
+                                'eventsPlot': EventsPlot,
                             }[key];
-                            return PlotComponent ? <PlotComponent data={plotData[key]} /> : null;
+                            return PlotComponent ? <PlotComponent data={plotData[key]} start={start_time} end={end_time}/> : null;
                         })}
                     </div>
                 </div>
