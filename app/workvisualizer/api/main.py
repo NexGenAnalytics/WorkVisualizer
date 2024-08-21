@@ -328,7 +328,7 @@ def analyze_representative_rank():
                 max_ranks_per_cluster = cluster['n_ranks']
                 representative_rank = cluster['representative rank']
 
-        json_response = {'representative rank': representative_rank}
+        json_response = {'representative rank': representative_rank.split("rank ")[1]}
 
     analysis_dir = os.path.join(files_dir, "analysis")
     os.makedirs(analysis_dir, exist_ok=True)

@@ -50,21 +50,20 @@ export default function Page() {
         { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/0' } },
         ]);
     const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
-    const [analysisResult, setAnalysisResult] = useState(null);
     const [representativeRank, setRepresentativeRank] = useState(null);
 
     const handleAnalysisButtonClick = async () => {
         setIsAnalysisRunning(true);
         const response = await fetch('/api/analysis/representativerank');
         const data = await response.json();
-        setAnalysisResult(data);
+        setRepresentativeRank(data["representative rank"]);
         setIsAnalysisRunning(false);
     };
 
     const handleRadioChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const rank = event.target.value;
         setInvalidRank(false);
-        if (rank == "rep") {
+        if (rank == "rep" && representativeRank !== null) {
             setSpecifyRank(false);
             setSelectedRank(rank);
             updateAllEndpoints(selectedDepth, representativeRank);
@@ -142,12 +141,6 @@ export default function Page() {
         }
         fetchData();
     }, [plots]);
-
-    useEffect(() => {
-        if (analysisResult !== null && analysisResult !== undefined) {
-            setRepresentativeRank(analysisResult['representative rank']);
-        }
-    }, [analysisResult]);
 
     return (
         <div className='h-screen '>
