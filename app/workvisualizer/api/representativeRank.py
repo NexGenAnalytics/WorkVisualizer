@@ -132,12 +132,12 @@ def apply_kmeans(
 ):
     silhouette = []
     # @todo: add more logic here to avoid doing too much kmeans for large numbers of ranks
-    for n_clusters in range(2, 5):
+    for n_clusters in range(2, min(5, n_ranks - 1)):
         kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(df)
         score = silhouette_score(df, kmeans.labels_)
         print(f'  KMeans: {n_clusters} clusters -> silhouette score: {score}')
         silhouette.append(score)
-    if np.max(silhouette) < 0.5:
+    if np.max(silhouette) < 0.2:
         print(f"Silhouette scores are low: {silhouette}")
         n_clusters = 1
         kmeans = None

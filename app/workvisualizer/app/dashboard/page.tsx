@@ -21,6 +21,7 @@ interface Plot {
     }
 }
 
+let comm_size : number;
 let known_ranks : string[] = []
 let rank_range : string = ""
 let rank_range_error : string = ""
@@ -50,7 +51,7 @@ export default function Page() {
         ]);
     const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
     const [analysisResult, setAnalysisResult] = useState(null);
-    const [representativeRank, setRepresentativeRank] = useState("");
+    const [representativeRank, setRepresentativeRank] = useState(null);
 
     const handleAnalysisButtonClick = async () => {
         setIsAnalysisRunning(true);
@@ -96,7 +97,7 @@ export default function Page() {
         setChangedInput(false);
     }
 
-    const handleMaxDepthChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleMaxDepthChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
         const initial_depth = parseInt(event.target.value, 10);
         const depth =  (initial_depth >= maximum_depth && 5 >= maximum_depth) ? 5 : initial_depth;
         setSelectedDepth(depth);
@@ -129,19 +130,21 @@ export default function Page() {
                 dataMap[res.key] = res.data;
             });
             setPlotData(dataMap);
-            known_ranks = dataMap['summaryTable']['known.ranks'].map(Number).sort((a, b) => a - b);
+            comm_size = dataMap['summaryTable']['mpi.world.size'];
+            // known_ranks = dataMap['summaryTable']['known.ranks'].map(Number).sort((a, b) => a - b);
+            let tmp_known_ranks = Array.from({length: comm_size}, (_, i) => i);
             known_depths = dataMap['summaryTable']['known.depths'].sort();
             maximum_depth = dataMap['summaryTable']['maximum.depth'];
 
             rank_range = `Enter a rank ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
             rank_range_error = `Rank not found in range ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
-            known_ranks = known_ranks.map(String);
+            known_ranks = tmp_known_ranks.map(String);
         }
         fetchData();
     }, [plots]);
 
     useEffect(() => {
-        if (analysisResult) {
+        if (analysisResult !== null && analysisResult !== undefined) {
             setRepresentativeRank(analysisResult['representative rank']);
         }
     }, [analysisResult]);
@@ -189,7 +192,7 @@ export default function Page() {
                                     onChange={handleRadioChange}
                                     style={{ marginLeft: '15px' }}
                                 >
-                                    <Radio key="rep" value="rep">
+                                    <Radio key="rep" value="rep" isDisabled={representativeRank == null || representativeRank == undefined}>
                                         Representative
                                         {/* it would be cool to have a small (?) icon that explains what the representative rank is */}
                                     </Radio>
@@ -256,7 +259,7 @@ export default function Page() {
                     <Spacer y={2}/>
                     <Divider orientation='horizontal'/>
                     <Spacer y={2}/>
-                    {representativeRank ?
+                    {representativeRank !== null && representativeRank !== undefined ?
                             <Card>
                               <CardBody>
                                 <p>Representative rank: {representativeRank}</p>
