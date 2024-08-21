@@ -50,7 +50,7 @@ export default function Page() {
         ]);
     const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
     const [analysisResult, setAnalysisResult] = useState(null);
-    const [representativeRank, setRepresentativeRank] = useState("");
+    const [representativeRank, setRepresentativeRank] = useState(null);
 
     const handleAnalysisButtonClick = async () => {
         setIsAnalysisRunning(true);
@@ -256,7 +256,7 @@ export default function Page() {
                     <Spacer y={2}/>
                     <Divider orientation='horizontal'/>
                     <Spacer y={2}/>
-                    {representativeRank ?
+                    {representativeRank !== null && representativeRank !== undefined ?
                             <Card>
                               <CardBody>
                                 <p>Representative rank: {representativeRank}</p>
