@@ -8,3 +8,4 @@ orjson
 pandas
 scikit-learn
 matplotlib
+seaborn

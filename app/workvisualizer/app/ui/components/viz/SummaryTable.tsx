@@ -20,27 +20,27 @@ export default function SummaryTable({ data }) {
       }
   }
 
-  // Define a function to format the imbalance metric
-  function formatImbalance(imbalance) {
-    if (imbalance < 0.01) {
-        return imbalance.toExponential(2);
-    } else {
-        return imbalance.toFixed(2);
-    }
-  }
+  // // Define a function to format the imbalance metric
+  // function formatImbalance(imbalance) {
+  //   if (imbalance < 0.01) {
+  //       return imbalance.toExponential(2);
+  //   } else {
+  //       return imbalance.toFixed(2);
+  //   }
+  // }
 
-  const sortedImbalance = data["imbalance"] && data["imbalance"].length > 0
-    ? [...data["imbalance"]].sort((a, b) => b.imbalance - a.imbalance)
-    : [];
+  // const sortedImbalance = data["imbalance"] && data["imbalance"].length > 0
+  //   ? [...data["imbalance"]].sort((a, b) => b.imbalance - a.imbalance)
+  //   : [];
 
-  const calculateAverage = (rankInfo) => {
-    const ranks = Object.values(rankInfo);
-    const totalDuration = ranks.reduce((acc, rank) => acc + rank.dur, 0);
-    const totalCount = ranks.reduce((acc, rank) => acc + rank.count, 0);
-    const averageDuration = totalDuration / ranks.length;
-    const averageCount = totalCount / ranks.length;
-    return { averageDuration, averageCount };
-  };
+  // const calculateAverage = (rankInfo) => {
+  //   const ranks = Object.values(rankInfo);
+  //   const totalDuration = ranks.reduce((acc, rank) => acc + rank.dur, 0);
+  //   const totalCount = ranks.reduce((acc, rank) => acc + rank.count, 0);
+  //   const averageDuration = totalDuration / ranks.length;
+  //   const averageCount = totalCount / ranks.length;
+  //   return { averageDuration, averageCount };
+  // };
 
   const callTypes = ["other", "mpi_collective", "mpi_p2p", "kokkos"];
   const callTypeLabels = {

@@ -6,9 +6,11 @@ import { VisualizationProps } from '@/app/types';
 interface EventsPlotProps extends VisualizationProps {
     start: number;
     end: number;
+    timeSlices: any;
+    showSliceLines: boolean;
 }
 
-const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end }) => {
+const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, showSliceLines }) => {
     const ref = useRef();
     const [visibleTypes, setVisibleTypes] = useState(["mpi_collective", "mpi_p2p", "kokkos", "other"]);
     const [filteredData, setFilteredData] = useState(data);
@@ -257,6 +259,30 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end }) => {
         // Stack to keep track of zoom states
         let zoomStack = [];
 
+        if (showSliceLines && timeSlices) {
+            svg.append("g")
+                .selectAll("line")
+                .data(Object.values(timeSlices))
+                .enter().append("line")
+                .attr("class", "slice-line")
+                .attr("x1", d => x(d.ts[0]))
+                .attr("x2", d => x(d.ts[0]))
+                .attr("y1", marginTop)
+                .attr("y2", height - marginBottom)
+                .attr("stroke", "red")
+                .attr("stroke-width", 2);
+
+
+        }
+
+        function updateSliceLines() {
+            // Update slice lines
+            svg.selectAll(".slice-line")
+                .transition().duration(750)
+                .attr("x1", d => x(d.ts[0]))
+                .attr("x2", d => x(d.ts[0]));
+        }
+
         // A function that update the chart for given boundaries
         function updateChart({ selection }) {
 
@@ -318,6 +344,8 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end }) => {
                     const firstInDepth = sortedData.find(item => item.depth === d);
                     return y(Number(keyIndexMap.get(firstInDepth.ftn_id)));
                 });
+
+            updateSliceLines();
         }
 
         svg.on("dblclick", () => {
@@ -360,6 +388,8 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end }) => {
                         const firstInDepth = sortedData.find(item => item.depth === d);
                         return y(Number(keyIndexMap.get(firstInDepth.ftn_id)));
                     });
+
+                updateSliceLines();
             }
         });
 
@@ -372,7 +402,8 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end }) => {
             }
         }
 
-    }, [filteredData, showDuration]);
+
+    }, [filteredData, showDuration, showSliceLines, timeSlices]);
 
     const handleCheckboxChange = (values) => {
         setVisibleTypes(values);

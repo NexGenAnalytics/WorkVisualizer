@@ -38,6 +38,7 @@ from events2hierarchy import events_to_hierarchy
 from aggregateMetadata import aggregate_metadata
 from logical_hierarchy import generate_logical_hierarchy_from_root
 import representativeRank
+import timeSlice
 
 import json
 import mmap
@@ -179,7 +180,7 @@ async def upload_cali_files(files: List[UploadFile] = File(...)):
 # This endpoint doesn't use the rank at all for now
 @app.get("/api/metadata/{depth}/{rank}")
 @log_timed()
-def get_metadata(depth, rank):
+def get_metadata(depth):
     metadata_dir = os.path.join(files_dir, "metadata")
 
     depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
@@ -360,3 +361,58 @@ def analyze_representative_rank():
     filepath = os.path.join(analysis_dir, filename)
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(json_response, f, ensure_ascii=False, indent=4)
+
+
+@app.get("/api/analysis/timeslices")
+@log_timed()
+def get_timeslices():
+    try:
+        analysis_dir = os.path.join(files_dir, "analysis")
+
+        filename = f"timeslices.json"
+        filepath = os.path.join(analysis_dir, filename)
+
+        if not os.path.isfile(filepath):
+            analyze_timeslices()
+
+        return get_data_from_json(filepath)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@log_timed()
+def analyze_timeslices():
+    events_dir = os.path.join(files_dir, "events")
+    file_name_template = str(
+        os.path.abspath(os.path.join(events_dir, "events-{}-depth_5.json")))
+
+    representative_rank = get_representative_rank()
+
+    # extract rank number out of representative_rank string that is of form "rank 0"
+    representative_rank = representative_rank['representative rank']
+
+    allreduce_df = timeSlice.prepare_data_for_rank(file_name_template, representative_rank)
+    clustered_df = timeSlice.cluster_collectives(allreduce_df)
+    metadata_dir = os.path.join(files_dir, "metadata")
+    # file is whatever file in metadata_dir that starts with metadata
+    filename = [file for file in os.listdir(metadata_dir) if file.startswith("metadata")][0]
+    filepath = os.path.join(metadata_dir, filename)
+    metadata = get_data_from_json(filepath)
+    program_runtime = metadata['program.runtime']
+    slices = timeSlice.define_slices(clustered_df, total_runtime=program_runtime)
+
+    # modify the slices so they have 'slice ...' as the key and the times are stores in the 'ts' sub-key
+    slices = {
+        i: {
+            "ts": [ts for ts in slice_data],
+            "statistics": {}
+        } for i, slice_data in enumerate(slices)
+    }
+
+    analysis_dir = os.path.join(files_dir, "analysis")
+    # create the analysis directory if it does not exist
+    # os.makedirs(analysis_dir, exist_ok=True)
+    filename = f"timeslices.json"
+    filepath = os.path.join(analysis_dir, filename)
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(slices, f, ensure_ascii=False, indent=4)

@@ -1,17 +1,36 @@
 'use client'
-import React, { useState, useEffect } from 'react';
+import React, {useEffect, useState} from 'react';
 import NavBar from "@/app/ui/components/NavBar";
-import { Button } from "@nextui-org/react";
-import { Tabs, Tab, Card, CardBody } from "@nextui-org/react";
-import { Divider, Spacer } from "@nextui-org/react";
-import { Select, SelectItem, Checkbox } from "@nextui-org/react";
-import { RadioGroup, Radio, Input } from "@nextui-org/react";
 import CallTree from "@/app/ui/components/viz/CallTree";
 import ProportionAnalyzer from "@/app/ui/components/viz/ProportionAnalyzer";
 import EventsPlot from "@/app/ui/components/viz/EventsPlot";
 import SummaryTable from "@/app/ui/components/viz/SummaryTable";
-import {CircularProgress} from "@nextui-org/react";
-
+import {
+    Button,
+    Card,
+    CardBody,
+    Checkbox,
+    CircularProgress,
+    Divider,
+    Dropdown,
+    DropdownItem,
+    DropdownMenu,
+    DropdownTrigger,
+    Input,
+    Radio,
+    RadioGroup,
+    Select,
+    SelectItem,
+    Spacer,
+    Tab,
+    Table,
+    TableBody,
+    TableCell,
+    TableColumn,
+    TableHeader,
+    TableRow,
+    Tabs
+} from "@nextui-org/react";
 
 interface Plot {
     key: string;
@@ -54,6 +73,11 @@ export default function Page() {
         ]);
     const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
     const [representativeRank, setRepresentativeRank] = useState(null);
+    const [isTimeSlicingRunning, setIsTimeSlicingRunning] = useState(false);
+    const [timeSlices, setTimeSlices] = useState(null);
+    const [selectedSlice, setSelectedSlice] = useState<string | null>(null);
+    const [showSliceLines, setShowSliceLines] = useState(false);
+
 
     const handleAnalysisButtonClick = async () => {
         setIsAnalysisRunning(true);
@@ -61,6 +85,14 @@ export default function Page() {
         const data = await response.json();
         setRepresentativeRank(data["representative rank"]);
         setIsAnalysisRunning(false);
+    };
+
+    const handleTimeSlicingButtonClick = async () => {
+        setIsTimeSlicingRunning(true);
+        const response = await fetch('/api/analysis/timeslices');
+        const data = await response.json();
+        setTimeSlices(data);
+        setIsTimeSlicingRunning(false);
     };
 
     const handleRadioChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,7 +184,7 @@ export default function Page() {
         <div className='h-screen '>
             <NavBar/>
             <div className='flex flex-row h-full'>
-                <div className="flex flex-col p-4 h-full overflow-y-auto" style={{ minWidth: '425px', maxWidth: '525px' }}>
+                <div className="flex flex-col p-4 h-full overflow-y-auto" style={{ minWidth: '500px', maxWidth: '525px' }}>
                     <Checkbox
                         className="min-w-full"
                         isSelected={isIndentedTreeSelected}
@@ -179,6 +211,110 @@ export default function Page() {
                             <Card>
                                 {plotData['summaryTable'] ? <SummaryTable data={plotData['summaryTable']} /> : null}
                             </Card>
+                        </Tab>
+                        <Tab key="analysis" title="Analysis">
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <Spacer y={2}/>
+                                {representativeRank !== null && representativeRank !== undefined ?
+                                        <Card>
+                                          <CardBody>
+                                            <p>Representative rank: {representativeRank}</p>
+                                          </CardBody>
+                                        </Card>
+                                    :
+                                    <Button
+                                        color="default"
+                                        onPress={handleAnalysisButtonClick}
+                                        onKeyDown={handleAnalysisButtonClick}
+                                        isDisabled={isAnalysisRunning}>
+                                        {isAnalysisRunning ?
+                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                <CircularProgress size="sm" aria-label="Loading..."/>
+                                                <span style={{ marginLeft: '10px' }}>Running...</span>
+                                            </div>
+                                            : 'Run rank analysis'}
+                                    </Button>
+                                }
+                                <Spacer x={2}/>
+                                {timeSlices !== null && timeSlices !== undefined ?
+                                    <Card>
+                                        <CardBody>
+                                            <p>Time Slices Generated ✅</p>
+                                            <Checkbox
+                                                isSelected={showSliceLines}
+                                                onChange={(e) => setShowSliceLines(e.target.checked)}
+                                            >
+                                                Show Slice Lines
+                                            </Checkbox>
+                                        </CardBody>
+                                    </Card>
+                                    :
+                                    <Button
+                                        color="default"
+                                        onPress={handleTimeSlicingButtonClick}
+                                        onKeyDown={handleTimeSlicingButtonClick}
+                                        isDisabled={isTimeSlicingRunning}>
+                                        {isTimeSlicingRunning ?
+                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                <CircularProgress size="sm" aria-label="Loading..."/>
+                                                <span style={{ marginLeft: '10px' }}>Running...</span>
+                                            </div>
+                                            : 'Run time slicing analysis'}
+                                    </Button>
+                                }
+                            </div>
+                            <Spacer y={2}/>
+                            {timeSlices !== null && timeSlices !== undefined ?
+                                <>
+                                    <Input
+                                        type="number"
+                                        placeholder="Enter slice name"
+                                        value={selectedSlice || ""}
+                                        onChange={(e) => setSelectedSlice(e.target.value)}
+                                    />
+                                    <Spacer y={2}/>
+                                    <Table aria-label="Time Slices Table">
+                                        <TableHeader>
+                                            <TableColumn>Slice Name</TableColumn>
+                                            <TableColumn>Begin</TableColumn>
+                                            <TableColumn>End</TableColumn>
+                                            <TableColumn>Statistics</TableColumn>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {Object.entries(timeSlices).map(([sliceName, sliceData]) => (
+                                                sliceName === selectedSlice ?
+                                                    <TableRow key={sliceName}>
+                                                        <TableCell>{sliceName}</TableCell>
+                                                        <TableCell>
+                                                            {
+                                                                `${sliceData.ts[0].toFixed(3)}`
+                                                            }
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {
+                                                                `${sliceData.ts[1].toFixed(3)}`
+                                                            }
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Dropdown>
+                                                                <DropdownTrigger>
+                                                                    <Button>Statistics</Button>
+                                                                </DropdownTrigger>
+                                                                <DropdownMenu>
+                                                                    {Object.entries(sliceData.statistics).map(([statKey, statValue]) => (
+                                                                        <DropdownItem key={statKey}>{`${statKey}: ${statValue}`}</DropdownItem>
+                                                                    ))}
+                                                                </DropdownMenu>
+                                                            </Dropdown>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                    : null
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </>
+                                : null
+                            }
                         </Tab>
                         <Tab key="setting" title="Settings">
                             <Card>
@@ -255,29 +391,6 @@ export default function Page() {
                             </Card>
                         </Tab>
                     </Tabs>
-                    <Spacer y={2}/>
-                    <Divider orientation='horizontal'/>
-                    <Spacer y={2}/>
-                    {representativeRank !== null && representativeRank !== undefined ?
-                            <Card>
-                              <CardBody>
-                                <p>Representative rank: {representativeRank}</p>
-                              </CardBody>
-                            </Card>
-                        :
-                        <Button
-                            color="default"
-                            onPress={handleAnalysisButtonClick}
-                            onKeyDown={handleAnalysisButtonClick}
-                            isDisabled={isAnalysisRunning}>
-                            {isAnalysisRunning ?
-                                <div style={{ display: 'flex', alignItems: 'center' }}>
-                                    <CircularProgress size="sm" aria-label="Loading..."/>
-                                    <span style={{ marginLeft: '10px' }}>Running...</span>
-                                </div>
-                                : 'Run analysis'}
-                        </Button>
-                    }
 
                 </div>
                 <Divider orientation='vertical'/>
@@ -295,7 +408,7 @@ export default function Page() {
                                 'proportionAnalyzer': ProportionAnalyzer,
                                 'eventsPlot': EventsPlot,
                             }[key];
-                            return PlotComponent ? <PlotComponent data={plotData[key]} start={start_time} end={end_time}/> : null;
+                            return PlotComponent ? <PlotComponent data={plotData[key]} start={start_time} end={end_time} timeSlices={timeSlices} showSliceLines={showSliceLines} /> : null;
                         })}
                     </div>
                 </div>
