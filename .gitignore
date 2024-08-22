@@ -5,3 +5,4 @@ misc/hierarchies
 app/workvisualizer/api/files/*
 app/workvisualizer/tests/data/*
 !app/workvisualizer/tests/data/cali
+app.log*
