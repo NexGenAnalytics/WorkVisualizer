@@ -178,7 +178,7 @@ async def upload_cali_files(files: List[UploadFile] = File(...)):
 
 
 # This endpoint doesn't use the rank at all for now
-@app.get("/api/metadata/{depth}")
+@app.get("/api/metadata/{depth}/{rank}")
 @log_timed()
 def get_metadata(depth):
     metadata_dir = os.path.join(files_dir, "metadata")
