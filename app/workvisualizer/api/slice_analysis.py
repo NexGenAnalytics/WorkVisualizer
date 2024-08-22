@@ -41,8 +41,8 @@ def calculate_slice_stats(rank_slices):
     """Calculate stats about each slice."""
     slice_stats = {}
     for slice_id, events in rank_slices.items():
-        type_counter = {"collective": 0, "mpi": 0, "kokkos": 0, "other": 0}
-        type_timer = {"collective": 0.0, "mpi": 0.0, "kokkos": 0.0, "other": 0.0, "MPI_Allreduce": 0.0}
+        type_counter = {"mpi_collective": 0, "mpi_p2p": 0, "kokkos": 0, "other": 0}
+        type_timer = {"mpi_collective": 0.0, "mpi_p2p": 0.0, "kokkos": 0.0, "other": 0.0, "MPI_Allreduce": 0.0}
         for event in events:
             type_counter[event["type"]] += 1
             type_timer[event["type"]] += event["dur"]
