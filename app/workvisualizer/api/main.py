@@ -178,9 +178,9 @@ async def upload_cali_files(files: List[UploadFile] = File(...)):
 
 
 # This endpoint doesn't use the rank at all for now
-@app.get("/api/metadata/{depth}/{rank}")
+@app.get("/api/metadata/{depth}")
 @log_timed()
-def get_metadata(depth, rank):
+def get_metadata(depth):
     metadata_dir = os.path.join(files_dir, "metadata")
 
     depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
@@ -393,7 +393,13 @@ def analyze_timeslices():
 
     allreduce_df = timeSlice.prepare_data_for_rank(file_name_template, representative_rank)
     clustered_df = timeSlice.cluster_collectives(allreduce_df)
-    slices = timeSlice.define_slices(clustered_df, total_runtime=1.4)
+    metadata_dir = os.path.join(files_dir, "metadata")
+    # file is whatever file in metadata_dir that starts with metadata
+    filename = [file for file in os.listdir(metadata_dir) if file.startswith("metadata")][0]
+    filepath = os.path.join(metadata_dir, filename)
+    metadata = get_data_from_json(filepath)
+    program_runtime = metadata['program.runtime']
+    slices = timeSlice.define_slices(clustered_df, total_runtime=program_runtime)
 
     # modify the slices so they have 'slice ...' as the key and the times are stores in the 'ts' sub-key
     slices = {

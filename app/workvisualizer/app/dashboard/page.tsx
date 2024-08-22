@@ -69,7 +69,7 @@ export default function Page() {
         { key: 'callTree', plot: { label: 'Call Tree', endpoint: '/api/logical_hierarchy/-1/5/0' } },
         { key: 'proportionAnalyzer', plot: { label: 'Proportion Analyzer', endpoint: '/api/logical_hierarchy/-1/5/0'} },
         { key: 'eventsPlot', plot: { label: 'Events Plot', endpoint: '/api/eventsplot/5/0'} },
-        { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/0' } },
+        { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5' } },
         ]);
     const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
     const [representativeRank, setRepresentativeRank] = useState(null);

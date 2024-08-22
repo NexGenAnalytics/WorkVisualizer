@@ -10,7 +10,7 @@ interface EventsPlotProps extends VisualizationProps {
     showSliceLines: boolean;
 }
 
-const SpaceTime: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, showSliceLines }) => {
+const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, showSliceLines }) => {
     const ref = useRef();
     const [visibleTypes, setVisibleTypes] = useState(["mpi_collective", "mpi_p2p", "kokkos", "other"]);
     const [filteredData, setFilteredData] = useState(data);
