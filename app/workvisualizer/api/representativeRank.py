@@ -7,6 +7,7 @@ import orjson
 import os
 import sys
 import numpy as np
+from typing import List
 import concurrent.futures
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -38,7 +39,7 @@ def extract_function_names(file):
 
 
 @log_timed()
-def get_unique_function_names(files: list[str], function_pattern_to_keep: str = None,
+def get_unique_function_names(files: List[str], function_pattern_to_keep: str = None,
                               function_pattern_to_drop: str = None):
     function_names = set()
     with concurrent.futures.ProcessPoolExecutor() as executor:
@@ -61,7 +62,7 @@ def load_rank_data(file_name_template, rank):
 
 
 @log_timed()
-def create_feature_dataframe(file_name_template: str, ranks: list[int], function_names: list[str]):
+def create_feature_dataframe(file_name_template: str, ranks: List[int], function_names: List[str]):
     columns = [f'{name}_{stat}' for name in function_names for stat in
                ['duration_min', 'duration_q1', 'duration_q2', 'duration_avg', 'duration_sum', 'duration_q3', 'duration_max', 'n_calls']]
 
@@ -154,7 +155,7 @@ def apply_kmeans(
 def get_representative_ranks_of_clusters(
         df: pd.DataFrame,
         kmeans: KMeans,
-        ranks: list[int]
+        ranks: List[int]
 ):
     centroids = kmeans.cluster_centers_
     # print(centroids)

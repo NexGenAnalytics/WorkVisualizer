@@ -7,7 +7,7 @@ export const dataRequirements = {
     params: {} // Additional parameters if needed
 };
 
-const GlobalIndentedTree = ({ data }) => {
+const CallTree = ({ data }) => {
     const ref = useRef();
 
     useEffect(() => {
@@ -23,7 +23,7 @@ const GlobalIndentedTree = ({ data }) => {
 
         // Define color scale for different types
         const colorScale = d3.scaleOrdinal()
-            .domain(["collective", "mpi", "kokkos", "other"])
+            .domain(["mpi_collective", "mpi_p2p", "kokkos", "other"])
             .range(["#1f77b4", "#f5a524", "#2ca02c", "#a783c9"]);
 
         const columns = [
@@ -139,4 +139,4 @@ const GlobalIndentedTree = ({ data }) => {
     );
 };
 
-export default GlobalIndentedTree;
+export default CallTree;

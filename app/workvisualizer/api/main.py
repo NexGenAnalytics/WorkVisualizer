@@ -35,6 +35,7 @@
 from logging_utils.logging_utils import log_timed, set_log_level
 from cali2events import convert_cali_to_json
 from events2hierarchy import events_to_hierarchy
+from aggregateMetadata import aggregate_metadata
 from logical_hierarchy import generate_logical_hierarchy_from_root
 import representativeRank
 
@@ -43,6 +44,7 @@ import mmap
 import os
 import sys
 import re
+from typing import List
 import concurrent.futures
 
 import numpy as np
@@ -63,6 +65,38 @@ app.add_middleware(
 )
 
 files_dir = os.path.join(os.getcwd(), "files")
+
+
+@log_timed()
+def remove_existing_files(directory):
+    if os.path.isdir(directory):
+        for item in os.listdir(directory):
+            full_path = os.path.join(directory, item)
+            if os.path.isfile(full_path):
+                os.remove(full_path)
+            elif os.path.isdir(full_path):
+                remove_existing_files(full_path)
+
+
+@log_timed()
+def create_files_directory(files_directory):
+    """Creates all directories that are used by WV."""
+    os.makedirs(files_directory, exist_ok=True)
+
+    cali_dir = os.path.join(files_directory, "cali")
+    os.makedirs(cali_dir, exist_ok=True)
+
+    events_dir = os.path.join(files_directory, "events")
+    os.makedirs(events_dir, exist_ok=True)
+
+    unique_dir = os.path.join(files_directory, "unique-events")
+    os.makedirs(unique_dir, exist_ok=True)
+
+    metadata_dir = os.path.join(files_directory, "metadata")
+    os.makedirs(metadata_dir, exist_ok=True)
+
+    metadata_proc_dir = os.path.join(metadata_dir, "procs")
+    os.makedirs(metadata_proc_dir, exist_ok=True)
 
 
 # Endpoint to change the log level dynamically
@@ -87,16 +121,6 @@ def get_data_from_json(filepath):
             #     return orjson.loads(mm.read(mm.size()))
     except FileNotFoundError as e:
         sys.exit(f"Could not find {filepath}")
-
-
-@log_timed()
-def remove_existing_files(directory):
-    for item in os.listdir(directory):
-        full_path = os.path.join(directory, item)
-        if os.path.isfile(full_path):
-            os.remove(full_path)
-        elif os.path.isdir(full_path):
-            remove_existing_files(full_path)
 
 
 def chunk_list(lst, chunk_size):
@@ -127,14 +151,15 @@ def unpack_cali(maximum_depth_limit=None):
         for future in concurrent.futures.as_completed(futures):
             future.result()
 
+    aggregate_metadata(files_dir)
+    remove_existing_files(os.path.join(files_dir, "metadata", "procs"))
+
 
 @app.post("/api/upload")
-async def upload_cali_files(files: list[UploadFile] = File(...)):
-    os.makedirs(files_dir, exist_ok=True)
+async def upload_cali_files(files: List[UploadFile] = File(...)):
     remove_existing_files(files_dir)
-
+    create_files_directory(files_dir)
     cali_dir = os.path.join(files_dir, "cali")
-    os.makedirs(cali_dir, exist_ok=True)
 
     for file in files:
         try:
@@ -167,9 +192,9 @@ def get_metadata(depth, rank):
     return get_data_from_json(filepath)
 
 
-@app.get("/api/spacetime/{depth}/{rank}")
+@app.get("/api/eventsplot/{depth}/{rank}")
 @log_timed()
-def get_spacetime_data(depth, rank):
+def get_eventsplot_data(depth, rank):
     events_dir = os.path.join(files_dir, "events")
     depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
 
@@ -225,7 +250,6 @@ def get_logical_hierarchy_data(ftn_id, depth, rank):
     filepath = os.path.join(logical_dir, filename)
 
     unique_events_file = os.path.join(unique_dir, f"unique-events-{rank}-{depth_desc}.json")
-    print(unique_events_file)
     if not os.path.isfile(filepath):
         if not os.path.isfile(unique_events_file):
             unpack_cali(maximum_depth_limit=depth)

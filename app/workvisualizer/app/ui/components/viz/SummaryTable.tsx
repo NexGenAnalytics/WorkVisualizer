@@ -42,11 +42,11 @@ export default function SummaryTable({ data }) {
     return { averageDuration, averageCount };
   };
 
-  const callTypes = ["other", "collective", "mpi", "kokkos"];
+  const callTypes = ["other", "mpi_collective", "mpi_p2p", "kokkos"];
   const callTypeLabels = {
     "other": "Program",
-    "collective": "MPI Collective",
-    "mpi": "MPI Point-To-Point",
+    "mpi_collective": "MPI Collective",
+    "mpi_p2p": "MPI Point-To-Point",
     "kokkos": "Kokkos"
   };
 
@@ -81,7 +81,7 @@ export default function SummaryTable({ data }) {
           </Table>
         </AccordionItem>
 
-        <AccordionItem key="2" aria-label="Call Distribution" title="Call Distribution (averaged across ranks)">
+        <AccordionItem key="2" aria-label="Call Distribution" title="Call Distribution">
           <Table
             removeWrapper
             color={selectedColor}
@@ -91,21 +91,21 @@ export default function SummaryTable({ data }) {
           >
             <TableHeader>
               <TableColumn>Call Type</TableColumn>
-              <TableColumn>Total Counts</TableColumn>
+              <TableColumn>Average Counts per Rank</TableColumn>
               <TableColumn>Unique Counts</TableColumn>
             </TableHeader>
             <TableBody>
               {callTypes.map((type, index) => (
                 <TableRow key={index}>
                   <TableCell>{callTypeLabels[type]}</TableCell>
-                  <TableCell>{data["total.counts"]["average"][type]}</TableCell>
-                  <TableCell>{data["unique.counts"]["global"][type]}</TableCell>
+                  <TableCell>{data["average.counts"][type].toFixed(0)}</TableCell>
+                  <TableCell>{data["unique.counts"][type]}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </AccordionItem>
-        <AccordionItem key="3" aria-label="Imbalanced calls" title="Imbalanced Calls">
+        {/* <AccordionItem key="3" aria-label="Imbalanced calls" title="Imbalanced Calls">
           {data["imbalance"] && data["imbalance"].length > 0 ? (
             <Table
               removeWrapper
@@ -132,8 +132,8 @@ export default function SummaryTable({ data }) {
           ) : (
             <p>No imbalance was found.</p>
           )}
-        </AccordionItem>
-        <AccordionItem key="4" aria-label="Largest calls" title="Largest Calls (averaged across ranks)">
+        </AccordionItem> */}
+        <AccordionItem key="4" aria-label="Largest calls" title="Largest Calls">
           <Table
             removeWrapper
             color={selectedColor}
@@ -143,20 +143,15 @@ export default function SummaryTable({ data }) {
           >
             <TableHeader>
               <TableColumn>Function</TableColumn>
-              <TableColumn>Time Spent</TableColumn>
-              <TableColumn>Number of Instances</TableColumn>
+              <TableColumn>Average Time</TableColumn>
             </TableHeader>
             <TableBody>
-              {data["biggest.calls"].map((call, index) => {
-                const { averageDuration, averageCount } = calculateAverage(call.rank_info);
-                return (
-                  <TableRow key={index}>
-                    <TableCell>{call.name}</TableCell>
-                    <TableCell>{formatTime(averageDuration)} s</TableCell>
-                    <TableCell>{averageCount.toFixed(2)}</TableCell>
-                  </TableRow>
-                );
-              })}
+              {Object.entries(data["biggest.calls"]).map(([callName, duration], index) => (
+                <TableRow key={index}>
+                  <TableCell>{callName}</TableCell>
+                  <TableCell>{duration.toFixed(6)} s</TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </AccordionItem>

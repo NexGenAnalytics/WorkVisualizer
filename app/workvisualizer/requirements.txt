@@ -4,3 +4,7 @@ uvicorn
 caliper-reader
 python-multipart
 pytest
+orjson
+pandas
+scikit-learn
+matplotlib

@@ -95,8 +95,8 @@ all_collectives = ["MPI_Allgather", "MPI_Allgatherv", "MPI_Allreduce", "MPI_Allt
                    "MPI_User_function"]
 
 counts_template_dict = {"kokkos": {"total_count": 0, "unique_count": 0, "time": 0.0},
-                        "mpi": {"total_count": 0, "unique_count": 0, "time": 0.0},
-                        "collective": {"total_count": 0, "unique_count": 0, "time": 0.0},
+                        "mpi_p2p": {"total_count": 0, "unique_count": 0, "time": 0.0},
+                        "mpi_collective": {"total_count": 0, "unique_count": 0, "time": 0.0},
                         "other": {"total_count": 0, "unique_count": 0, "time": 0.0}}
 
 
@@ -232,6 +232,9 @@ class CaliTraceEventConverter:
         self.unique_event_counters = {}
         self.unique_functions = []
         self.known_ftns = []
+        self.ftn_ids = {}
+        self.earliest_start = 0.
+        self.latest_end = 0.
         self.known_ranks = []
         self.known_depths = []
         self.rank_unique_events_dict = {}
@@ -268,12 +271,15 @@ class CaliTraceEventConverter:
     @log_timed()
     def write(self, files_dir):
 
+        proc_id = ''.join(map(str, self.known_ranks[:3]))
+
         depth_desc = "depth_full" if self.maximum_depth_limit is None else f"depth_{self.maximum_depth_limit}"
         event_output_files = {rank: os.path.join(files_dir, "events", f"events-{rank}-{depth_desc}.json") for rank in
                               self.known_ranks}
         unique_events_output_files = {
             rank: os.path.join(files_dir, "unique-events", f"unique-events-{rank}-{depth_desc}.json") for rank in
             self.known_ranks}
+        metadata_proc_output_file = os.path.join(files_dir, "metadata", "procs", f"metadata-{proc_id}-{depth_desc}.json")
         metadata_output_file = os.path.join(files_dir, "metadata", f"metadata-{depth_desc}.json")
         unique_events_output_file = os.path.join(files_dir, "unique-events", f"unique-events-all-{depth_desc}.json")
 
@@ -294,19 +300,22 @@ class CaliTraceEventConverter:
         metadata_result["known.ranks"] = self.known_ranks
         metadata_result["known.depths"] = self.known_depths
         metadata_result["maximum.depth"] = max(self.known_depths)
+        metadata_result["program.start"] = self.earliest_start
+        metadata_result["program.end"] = self.latest_end
         metadata_result["unique.counts"] = {}
+        metadata_result["unique.ftnids"] = self.ftn_ids
         metadata_result["total.counts"] = {}
         agg_counts = {"total_count": {}, "unique_count": {}, "time": {}}
         for rank in self.known_ranks:
             metadata_result["unique.counts"][f"rank.{rank}"] = {
                 "kokkos": self.rank_event_counters[rank]["kokkos"]["unique_count"],
-                "mpi_p2p": self.rank_event_counters[rank]["mpi"]["unique_count"],
-                "mpi_collective": self.rank_event_counters[rank]["collective"]["unique_count"],
+                "mpi_p2p": self.rank_event_counters[rank]["mpi_p2p"]["unique_count"],
+                "mpi_collective": self.rank_event_counters[rank]["mpi_collective"]["unique_count"],
                 "other": self.rank_event_counters[rank]["other"]["unique_count"]}
             metadata_result["total.counts"][f"rank.{rank}"] = {
                 "kokkos": self.rank_event_counters[rank]["kokkos"]["total_count"],
-                "mpi_p2p": self.rank_event_counters[rank]["mpi"]["total_count"],
-                "mpi_collective": self.rank_event_counters[rank]["collective"]["total_count"],
+                "mpi_p2p": self.rank_event_counters[rank]["mpi_p2p"]["total_count"],
+                "mpi_collective": self.rank_event_counters[rank]["mpi_collective"]["total_count"],
                 "other": self.rank_event_counters[rank]["other"]["total_count"]}
             for call_type in self.rank_event_counters[rank].keys():
                 for key, val in self.rank_event_counters[rank][call_type].items():
@@ -364,8 +373,8 @@ class CaliTraceEventConverter:
         with open(unique_events_output_file, "w") as unique_events_output_all:
             json.dump(sorted(list((self.unique_events_dict.values())), key=lambda e: e["depth"]),
                       unique_events_output_all, indent=indent)
-        with open(metadata_output_file, "w") as metadata_output:
-            json.dump(metadata_result, metadata_output, indent=indent)
+        with open(metadata_proc_output_file, "w") as metadata_proc_output:
+            json.dump(metadata_result, metadata_proc_output, indent=indent)
 
         self.written += len(self.records) + len(self.samples)
 
@@ -398,9 +407,9 @@ class CaliTraceEventConverter:
     def _get_type(self, function_name):
         if "MPI_" in function_name:
             if function_name in all_collectives:
-                return "collective"
+                return "mpi_collective"
             else:
-                return "mpi"
+                return "mpi_p2p"
         elif "Kokkos::" in function_name:
             return "kokkos"
         else:
@@ -537,6 +546,12 @@ class CaliTraceEventConverter:
         self.rank_event_counters[rank][type]["time"] += (tst - btst)
         self.rank_event_counters[rank][type]["total_count"] += 1
 
+        if btst < self.earliest_start:
+            self.earliest_start = btst
+
+        if btst + dur > self.latest_end:
+            self.latest_end = btst + dur
+
         # Removed from trec: {ph="X", cat=attr}
         trec.update(name=name, eid=eid, ftn_id=ftn_id, depth=depth, type=type, ts=btst, dur=dur, path=path,
                     kernel_type=kernel_type, rank=rank)
@@ -548,6 +563,9 @@ class CaliTraceEventConverter:
                 self.unique_event_counters[type] = 1
             else:
                 self.unique_event_counters[type] += 1
+
+        if ftn_id not in self.ftn_ids:
+            self.ftn_ids[ftn_id] = type
 
         if ftn_id not in self.unique_events_dict:
             self.unique_events_dict[ftn_id] = trec.copy()
@@ -653,15 +671,6 @@ def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit:
         converter.end_timing(ts)
 
     ts = converter.start_timing("Writing ...")
-
-    events_dir = os.path.join(files_dir, "events")
-    os.makedirs(events_dir, exist_ok=True)
-
-    unique_dir = os.path.join(files_dir, "unique-events")
-    os.makedirs(unique_dir, exist_ok=True)
-
-    metadata_dir = os.path.join(files_dir, "metadata")
-    os.makedirs(metadata_dir, exist_ok=True)
 
     converter.write(files_dir)
     converter.end_timing(ts)

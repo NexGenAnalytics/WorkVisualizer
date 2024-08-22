@@ -37,3 +37,6 @@ next-env.d.ts
 
 # python
 __pycache__
+
+# logs
+app.log*
