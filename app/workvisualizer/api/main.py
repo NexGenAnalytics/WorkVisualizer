@@ -78,20 +78,20 @@ def remove_existing_files(directory):
 
 
 @log_timed()
-def create_files_directory():
+def create_files_directory(files_directory):
     """Creates all directories that are used by WV."""
-    os.makedirs(files_dir, exist_ok=True)
+    os.makedirs(files_directory, exist_ok=True)
 
-    cali_dir = os.path.join(files_dir, "cali")
+    cali_dir = os.path.join(files_directory, "cali")
     os.makedirs(cali_dir, exist_ok=True)
 
-    events_dir = os.path.join(files_dir, "events")
+    events_dir = os.path.join(files_directory, "events")
     os.makedirs(events_dir, exist_ok=True)
 
-    unique_dir = os.path.join(files_dir, "unique-events")
+    unique_dir = os.path.join(files_directory, "unique-events")
     os.makedirs(unique_dir, exist_ok=True)
 
-    metadata_dir = os.path.join(files_dir, "metadata")
+    metadata_dir = os.path.join(files_directory, "metadata")
     os.makedirs(metadata_dir, exist_ok=True)
 
     metadata_proc_dir = os.path.join(metadata_dir, "procs")
@@ -157,7 +157,7 @@ def unpack_cali(maximum_depth_limit=None):
 @app.post("/api/upload")
 async def upload_cali_files(files: list[UploadFile] = File(...)):
     remove_existing_files(files_dir)
-    create_files_directory()
+    create_files_directory(files_dir)
     cali_dir = os.path.join(files_dir, "cali")
 
     for file in files:
