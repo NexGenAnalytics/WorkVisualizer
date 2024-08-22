@@ -34,6 +34,7 @@
 #
 from logging_utils.logging_utils import log_timed, set_log_level
 from cali2events import convert_cali_to_json
+from sliceAnalysis import run_slice_analysis
 from events2hierarchy import events_to_hierarchy
 from aggregateMetadata import aggregate_metadata
 from logical_hierarchy import generate_logical_hierarchy_from_root
@@ -295,6 +296,24 @@ def get_representative_rank():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/analysis/rankclusters")
+@log_timed()
+def get_rank_clusters():
+    try:
+        # this is quite barebones; this will need to handle depth selection,
+        # and function type selection (ie cluster based on kokkos, mpi, user, etc. functions)
+        analysis_dir = os.path.join(files_dir, "analysis")
+
+        filename = f"rank_clusters.json"
+        filepath = os.path.join(analysis_dir, filename)
+
+        if not os.path.isfile(filepath):
+            analyze_representative_rank()
+
+        return get_data_from_json(filepath)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @log_timed()
 def analyze_representative_rank():
     events_dir = os.path.join(files_dir, "events")
@@ -355,8 +374,18 @@ def analyze_representative_rank():
 
         json_response = {'representative rank': representative_rank.split("rank ")[1]}
 
+    # Create json for clusters
+    # cluster_json = {cluster_id: {"ranks": []} for cluster_id in range(n_clusters)}
+    print()
     analysis_dir = os.path.join(files_dir, "analysis")
     os.makedirs(analysis_dir, exist_ok=True)
+    cluster_json = df.groupby('cluster').apply(lambda x: x.index.tolist()).to_dict()
+    filename = f"rank_clusters.json"
+    clusters_filepath = os.path.join(analysis_dir, filename)
+    with open(clusters_filepath, 'w', encoding='utf-8') as f:
+        json.dump(cluster_json, f, ensure_ascii=False, indent=4)
+    print()
+
     filename = f"representative_rank.json"
     filepath = os.path.join(analysis_dir, filename)
     with open(filepath, 'w', encoding='utf-8') as f:
@@ -399,13 +428,29 @@ def analyze_timeslices():
     filepath = os.path.join(metadata_dir, filename)
     metadata = get_data_from_json(filepath)
     program_runtime = metadata['program.runtime']
+    num_ranks = int(metadata['mpi.world.size'])
     slices = timeSlice.define_slices(clustered_df, total_runtime=program_runtime)
+
+    rank_slice_time_lost, slice_time_lost = run_slice_analysis(files_dir, representative_rank, slices)
+
+    # Simplify rank slice time lost for now
+    simplified_rank_slice_time_lost = {}
+    for ranks_list in rank_slice_time_lost.values():
+        for ranks_dict in ranks_list:
+            simplified_rank_slice_time_lost[ranks_dict["slice"]] = {
+                f"Rank {ranks_dict['rank']}": f"Lost the most time ({abs(ranks_dict['time_lost']):2f} seconds slower than the representative rank)" for ranks_dict in ranks_list
+            }
+
+    for slice_id in range(len(slices)):
+        if slice_id not in list(simplified_rank_slice_time_lost.keys()):
+            simplified_rank_slice_time_lost[slice_id] = {"": "No significant time-losing ranks in this slice."}
 
     # modify the slices so they have 'slice ...' as the key and the times are stores in the 'ts' sub-key
     slices = {
         i: {
             "ts": [ts for ts in slice_data],
-            "statistics": {}
+            "time_lost": f'{slice_time_lost[i]/num_ranks:2f}',
+            "statistics": simplified_rank_slice_time_lost[i]
         } for i, slice_data in enumerate(slices)
     }
 

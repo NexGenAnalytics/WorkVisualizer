@@ -4,6 +4,7 @@ import NavBar from "@/app/ui/components/NavBar";
 import CallTree from "@/app/ui/components/viz/CallTree";
 import ProportionAnalyzer from "@/app/ui/components/viz/ProportionAnalyzer";
 import EventsPlot from "@/app/ui/components/viz/EventsPlot";
+import ClusterTable from "@/app/ui/components/viz/ClusterTable";
 import SummaryTable from "@/app/ui/components/viz/SummaryTable";
 import {
     Button,
@@ -73,6 +74,7 @@ export default function Page() {
         ]);
     const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
     const [representativeRank, setRepresentativeRank] = useState(null);
+    const [rankClusters, setRankClusters] = useState(null);
     const [isTimeSlicingRunning, setIsTimeSlicingRunning] = useState(false);
     const [timeSlices, setTimeSlices] = useState(null);
     const [selectedSlice, setSelectedSlice] = useState<string | null>(null);
@@ -84,6 +86,9 @@ export default function Page() {
         const response = await fetch('/api/analysis/representativerank');
         const data = await response.json();
         setRepresentativeRank(data["representative rank"]);
+        const cluster_response = await fetch('/api/analysis/rankclusters');
+        const cluster_data = await cluster_response.json();
+        setRankClusters(cluster_data);
         setIsAnalysisRunning(false);
     };
 
@@ -190,7 +195,7 @@ export default function Page() {
                         isSelected={isIndentedTreeSelected}
                         onValueChange={setIsIndentedTreeSelected}
                     >
-                        Global Indented Tree
+                        Call Tree
                     </Checkbox>
                     <Select
                         label="Select Plots"
@@ -215,7 +220,7 @@ export default function Page() {
                         <Tab key="analysis" title="Analysis">
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                 <Spacer y={2}/>
-                                {representativeRank !== null && representativeRank !== undefined ?
+                                {/* {representativeRank !== null && representativeRank !== undefined ?
                                         <Card>
                                           <CardBody>
                                             <p>Representative rank: {representativeRank}</p>
@@ -234,7 +239,7 @@ export default function Page() {
                                             </div>
                                             : 'Run rank analysis'}
                                     </Button>
-                                }
+                                } */}
                                 <Spacer x={2}/>
                                 {timeSlices !== null && timeSlices !== undefined ?
                                     <Card>
@@ -267,6 +272,7 @@ export default function Page() {
                             {timeSlices !== null && timeSlices !== undefined ?
                                 <>
                                     <Input
+                                        label="Enter slice name"
                                         type="number"
                                         placeholder="Enter slice name"
                                         value={selectedSlice || ""}
@@ -278,7 +284,7 @@ export default function Page() {
                                             <TableColumn>Slice Name</TableColumn>
                                             <TableColumn>Begin</TableColumn>
                                             <TableColumn>End</TableColumn>
-                                            <TableColumn>Statistics</TableColumn>
+                                            <TableColumn>Avg Time Lost (s)</TableColumn>
                                         </TableHeader>
                                         <TableBody>
                                             {Object.entries(timeSlices).map(([sliceName, sliceData]) => (
@@ -298,7 +304,7 @@ export default function Page() {
                                                         <TableCell>
                                                             <Dropdown>
                                                                 <DropdownTrigger>
-                                                                    <Button>Statistics</Button>
+                                                                    <Button>{sliceData.time_lost}</Button>
                                                                 </DropdownTrigger>
                                                                 <DropdownMenu>
                                                                     {Object.entries(sliceData.statistics).map(([statKey, statValue]) => (
@@ -314,6 +320,10 @@ export default function Page() {
                                     </Table>
                                 </>
                                 : null
+                            }
+                            {rankClusters !== null && rankClusters !== undefined ?
+                                <ClusterTable clusters={rankClusters} />
+                            : null
                             }
                         </Tab>
                         <Tab key="setting" title="Settings">

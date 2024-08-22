@@ -138,7 +138,7 @@ def apply_kmeans(
         score = silhouette_score(df, kmeans.labels_)
         print(f'  KMeans: {n_clusters} clusters -> silhouette score: {score}')
         silhouette.append(score)
-    if np.max(silhouette) < 0.2:
+    if np.max(silhouette) < 0.1:
         print(f"Silhouette scores are low: {silhouette}")
         n_clusters = 1
         kmeans = None
