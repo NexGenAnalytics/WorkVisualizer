@@ -7,6 +7,7 @@ import orjson
 import os
 import sys
 import numpy as np
+from typing import List
 import concurrent.futures
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -38,7 +39,7 @@ def extract_function_names(file):
 
 
 @log_timed()
-def get_unique_function_names(files: list[str], function_pattern_to_keep: str = None,
+def get_unique_function_names(files: List[str], function_pattern_to_keep: str = None,
                               function_pattern_to_drop: str = None):
     function_names = set()
     with concurrent.futures.ProcessPoolExecutor() as executor:

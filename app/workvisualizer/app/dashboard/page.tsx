@@ -47,9 +47,9 @@ export default function Page() {
         //      root (only for hierarchies): -1 (shows entire available tree)
         //      depth:                        5 (only parses records with path depth < 5)
         //      rank:                         0 (default to rank 0)
-        { key: 'callTree', plot: { label: 'Global Indented Tree', endpoint: '/api/logical_hierarchy/-1/5/0' } },
-        { key: 'proportionAnalyzer', plot: { label: 'Logical Sun Burst', endpoint: '/api/logical_hierarchy/-1/5/0'} },
-        { key: 'eventsPlot', plot: { label: 'Space Time', endpoint: '/api/eventsplot/5/0'} },
+        { key: 'callTree', plot: { label: 'Call Tree', endpoint: '/api/logical_hierarchy/-1/5/0' } },
+        { key: 'proportionAnalyzer', plot: { label: 'Proportion Analyzer', endpoint: '/api/logical_hierarchy/-1/5/0'} },
+        { key: 'eventsPlot', plot: { label: 'Events Plot', endpoint: '/api/eventsplot/5/0'} },
         { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/0' } },
         ]);
     const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);

@@ -170,8 +170,8 @@ const GlobalSunBurst = ({ data }) => {
                 <Checkbox color="success" value="kokkos">Kokkos</Checkbox>
                 <Checkbox color="secondary" value="other">Application</Checkbox>
             </CheckboxGroup>
-            {/* <Spacer y={5} />
-            <Switch
+            <Spacer y={5} />
+            {/* <Switch
                 checked={showImbalance}
                 onChange={handleImbalanceToggle}
                 size="sm"
