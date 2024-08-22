@@ -155,7 +155,7 @@ def unpack_cali(maximum_depth_limit=None):
 
 
 @app.post("/api/upload")
-async def upload_cali_files(files: list[UploadFile] = File(...)):
+async def upload_cali_files(files: List[UploadFile] = File(...)):
     remove_existing_files(files_dir)
     create_files_directory(files_dir)
     cali_dir = os.path.join(files_dir, "cali")
