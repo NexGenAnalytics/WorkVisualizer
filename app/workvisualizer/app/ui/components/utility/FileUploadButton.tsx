@@ -28,7 +28,7 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
 
         if (files && files.length > 0) {
             try {
-                axios.post('http://127.0.0.1:8000/api/clear');
+                await axios.post('http://127.0.0.1:8000/api/clear');
                 // Create an array of promises for parallel upload
                 const uploadPromises = Array.from(files).map((file) => {
                     const formData = new FormData();
@@ -46,13 +46,13 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
                 await Promise.all(uploadPromises);
 
                 console.log('All files uploaded successfully');
+
+                await axios.post('http://127.0.0.1:8000/api/unpack');
+
                 setIsLoading(false);
-
-                axios.post('http://127.0.0.1:8000/api/unpack');
-
-                // if (redirectOnSuccess) {
-                //     router.push(redirectOnSuccess);
-                // }
+                if (redirectOnSuccess) {
+                    router.push(redirectOnSuccess);
+                }
             } catch (error) {
                 console.error('Error uploading files', error);
                 setIsUploading(false);
