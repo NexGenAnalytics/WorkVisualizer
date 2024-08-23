@@ -14,7 +14,13 @@ const CallTree = ({ data }) => {
         const svg = d3.select(ref.current);
         svg.selectAll('*').remove();
 
-        const format = d3.format(",");
+        const format = value => {
+            // If the value can be represented within three decimal places, use fixed-point notation
+            if (Math.abs(value) >= 0.01 && Math.abs(value) < 100) {
+                return d3.format(".2f")(value);
+            }
+            return d3.format(".2e")(value);
+        };
         const nodeSize = 22;
         const root = d3.hierarchy(data).eachBefore((i => d => d.index = i++)(0));
         const nodes = root.descendants();
