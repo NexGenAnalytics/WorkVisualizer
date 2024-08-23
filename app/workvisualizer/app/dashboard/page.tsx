@@ -94,9 +94,15 @@ export default function Page() {
 
     const handleTimeSlicingButtonClick = async () => {
         setIsTimeSlicingRunning(true);
-        const response = await fetch('/api/analysis/timeslices');
-        const data = await response.json();
-        setTimeSlices(data);
+        const repr_response = await fetch('/api/analysis/representativerank');
+        const repr_data = await repr_response.json();
+        setRepresentativeRank(repr_data["representative rank"]);
+        const cluster_response = await fetch('/api/analysis/rankclusters');
+        const cluster_data = await cluster_response.json();
+        setRankClusters(cluster_data);
+        const slice_response = await fetch('/api/analysis/timeslices');
+        const slice_data = await slice_response.json();
+        setTimeSlices(slice_data);
         setIsTimeSlicingRunning(false);
     };
 
@@ -321,10 +327,10 @@ export default function Page() {
                                 </>
                                 : null
                             }
-                            {rankClusters !== null && rankClusters !== undefined ?
+                            {/* {rankClusters !== null && rankClusters !== undefined ?
                                 <ClusterTable clusters={rankClusters} />
                             : null
-                            }
+                            } */}
                         </Tab>
                         <Tab key="setting" title="Settings">
                             <Card>
