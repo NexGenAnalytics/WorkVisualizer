@@ -157,14 +157,18 @@ def unpack_cali(maximum_depth_limit=None):
     remove_existing_files(os.path.join(files_dir, "metadata", "procs"))
 
 
-@app.post("/api/upload")
-async def upload_cali_files(files: List[UploadFile] = File(...)):
+@app.post("/api/clear")
+async def clear_files_dir():
     remove_existing_files(files_dir)
     create_files_directory(files_dir)
+
+@app.post("/api/upload")
+async def upload_cali_files(files: List[UploadFile] = File(...)):
     cali_dir = os.path.join(files_dir, "cali")
 
     for file in files:
         try:
+            print(file)
             contents = await file.read()
             with open(f"{cali_dir}/{file.filename}", "wb") as f:
                 f.write(contents)
@@ -173,9 +177,11 @@ async def upload_cali_files(files: List[UploadFile] = File(...)):
         finally:
             await file.close()
 
-    unpack_cali(maximum_depth_limit=5)
-
     return {"message": "Successfully uploaded files."}
+
+@app.post("/api/unpack")
+def unpack_endpoint():
+    unpack_cali(maximum_depth_limit=5)
 
 
 # This endpoint doesn't use the rank at all for now
@@ -234,7 +240,7 @@ def get_eventsplot_data(depth, rank):
 
 #     if not os.path.isfile(filepath):
 #         if not os.path.isfile(events_file):
-#             unpack_cali()
+            # unpack_cali()
 #         events_to_hierarchy(events_file, filepath)
 
 #     return get_data_from_json(filepath)
