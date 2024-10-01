@@ -44,17 +44,16 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
 
                 console.log('All files uploaded successfully');
 
-                await axios.post('http://127.0.0.1:8000/api/unpack');
+                // await axios.post('http://127.0.0.1:8000/api/unpack');
 
-                setIsLoading(false);
                 if (redirectOnSuccess) {
                     router.push(redirectOnSuccess);
                 }
             } catch (error) {
                 console.error('Error uploading files', error);
-                setIsLoading(false);
             }
         }
+        setIsLoading(false);
     };
 
     return (
