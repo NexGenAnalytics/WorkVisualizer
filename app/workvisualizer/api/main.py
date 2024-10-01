@@ -35,13 +35,13 @@
 from logging_utils.logging_utils import log_timed, set_log_level
 from cali2events import convert_cali_to_json
 from sliceAnalysis import run_slice_analysis
-from events2hierarchy import events_to_hierarchy
 from aggregateMetadata import aggregate_metadata
 from logical_hierarchy import generate_logical_hierarchy_from_root
 import representativeRank
 import timeSlice
 
 import json
+import io
 import mmap
 import os
 import sys
@@ -84,9 +84,6 @@ def remove_existing_files(directory):
 def create_files_directory(files_directory):
     """Creates all directories that are used by WV."""
     os.makedirs(files_directory, exist_ok=True)
-
-    cali_dir = os.path.join(files_directory, "cali")
-    os.makedirs(cali_dir, exist_ok=True)
 
     events_dir = os.path.join(files_directory, "events")
     os.makedirs(events_dir, exist_ok=True)
@@ -143,28 +140,30 @@ def chunk_list(lst, chunk_size):
         yield lst[i:i + chunk_size]
 
 
-def process_chunk(chunk, files_dir):
-    convert_cali_to_json(chunk, files_dir)
+# def process_chunk(chunk, files_dir, maximum_depth_limit):
+    # convert_cali_to_json(chunk, files_dir, maximum_depth_limit)
 
 
 @log_timed()
-def unpack_cali():
-    cali_dir = os.path.join(files_dir, "cali")
-    input_files = [os.path.join(cali_dir, filename) for filename in os.listdir(cali_dir) if filename.endswith(".cali")]
+def unpack_cali(cali_stream, maximum_depth_limit=None):
+    # cali_dir = os.path.join(files_dir, "cali")
+    # input_files = [os.path.join(cali_dir, filename) for filename in os.listdir(cali_dir) if filename.endswith(".cali")]
 
-    if len(input_files) == 0:
-        return {"message": "No input .cali file was found."}
+    # if len(input_files) == 0:
+    #     return {"message": "No input .cali file was found."}
 
-    # Determine the number of CPU cores
-    num_cores = os.cpu_count()
-    chunk_size = max(1, len(input_files) // num_cores)  # Adjust chunk size based on the number of CPU cores
+    # # Determine the number of CPU cores
+    # num_cores = os.cpu_count()
+    # chunk_size = max(1, len(input_files) // num_cores)  # Adjust chunk size based on the number of CPU cores
 
-    chunks = list(chunk_list(input_files, chunk_size))
+    # chunks = list(chunk_list(input_files, chunk_size))
 
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        futures = [executor.submit(process_chunk, chunk, files_dir) for chunk in chunks]
-        for future in concurrent.futures.as_completed(futures):
-            future.result()
+    # with concurrent.futures.ProcessPoolExecutor() as executor:
+    #     futures = [executor.submit(process_chunk, chunk, files_dir, maximum_depth_limit) for chunk in chunks]
+    #     for future in concurrent.futures.as_completed(futures):
+    #         future.result()
+
+    convert_cali_to_json(cali_stream, files_dir, maximum_depth_limit)
 
     aggregate_metadata(files_dir)
     remove_existing_files(os.path.join(files_dir, "metadata", "procs"))
@@ -172,21 +171,14 @@ def unpack_cali():
 
 @app.post("/api/upload")
 async def upload_cali_files(files: List[UploadFile] = File(...)):
-    remove_existing_files(files_dir)
-    create_files_directory(files_dir)
-    cali_dir = os.path.join(files_dir, "cali")
-
     for file in files:
         try:
             contents = await file.read()
-            with open(f"{cali_dir}/{file.filename}", "wb") as f:
-                f.write(contents)
+            unpack_cali(contents, maximum_depth_limit=5)
         except Exception as e:
             return {"message": f"There was an error uploading {file.filename}: {e}"}
         finally:
             await file.close()
-
-    unpack_cali()
 
     return {"message": "Successfully uploaded files."}
 
@@ -199,9 +191,8 @@ def get_metadata(depth):
     filename = f"metadata.json"
     filepath = os.path.join(metadata_dir, filename)
 
-    if not os.path.isfile(filepath):
-        # TODO: Add error handling
-        pass
+    # if not os.path.isfile(filepath):
+    #     unpack_cali(maximum_depth_limit=depth)
 
     return get_data_from_json(filepath)
 
@@ -428,7 +419,6 @@ def analyze_timeslices():
     program_runtime = metadata['program.runtime']
     num_ranks = int(metadata['mpi.world.size'])
     slices = timeSlice.define_slices(clustered_df, total_runtime=program_runtime)
-
     rank_slice_time_lost, slice_time_lost = run_slice_analysis(files_dir, representative_rank, slices)
 
     # Only keep ranks within some threshold percentage of the total runtime
@@ -453,7 +443,6 @@ def analyze_timeslices():
     # modify the slices so they have 'slice ...' as the key and the times are stores in the 'ts' sub-key
     modified_slices = {}
     for i, slice_data in enumerate(slices):
-        print("slice_id: ", i)
         modified_slices[i] = {
             "ts": [ts for ts in slice_data],
             "time_lost": f'{slice_time_lost[i]}',

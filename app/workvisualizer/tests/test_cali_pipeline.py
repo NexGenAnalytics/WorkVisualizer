@@ -17,7 +17,6 @@ class TestConfig(unittest.TestCase):
         self.data_dir = os.path.join(self.test_dir, "data")
         self.cali_dir = os.path.join(self.data_dir, "cali")
 
-
         # Clear any non-cali directories
         for dir_name in os.listdir(self.data_dir):
             dir_path = os.path.join(self.data_dir, dir_name)
@@ -31,7 +30,10 @@ class TestConfig(unittest.TestCase):
         # Read in the cali files
         cali_files = [os.path.join(self.cali_dir, filename) for filename in os.listdir(self.cali_dir) if
                       filename.endswith(".cali")]
-        convert_cali_to_json(cali_files, self.data_dir)
+        for cali in cali_files:
+            with open(cali, "rb") as cali_binary:
+                cali_stream = cali_binary.read()
+                convert_cali_to_json(cali_stream, self.data_dir, maximum_depth_limit=2)
         aggregate_metadata(self.data_dir)
 
         # Now test that the logical hierarchy is created correctly

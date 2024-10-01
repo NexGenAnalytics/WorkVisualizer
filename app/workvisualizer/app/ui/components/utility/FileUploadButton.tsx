@@ -25,40 +25,37 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         setIsLoading(true);
         const files = event.target.files;
+
         if (files && files.length > 0) {
-            const formData = new FormData();
-
-            for (let i = 0; i < files.length; i++) {
-                formData.append('files', files[i], files[i].name);
-            }
-
-            setUploadProgress(0);
-            setIsUploading(true); // Start upload
-
             try {
-                const response = await axios.post('http://127.0.0.1:8000/api/upload', formData, {
-                    headers: {
-                        'Content-Type': 'multipart/form-data',
-                    },
-                    onUploadProgress: (progressEvent) => {
-                        const total = progressEvent.total || 0;
-                        const current = progressEvent.loaded || 0;
-                        const percentage = Math.floor((current / total) * 100);
-                        setUploadProgress(percentage); // Update upload progress
-                    },
+                await axios.post('http://127.0.0.1:8000/api/clear');
+                // Create an array of promises for parallel upload
+                const uploadPromises = Array.from(files).map((file) => {
+                    const formData = new FormData();
+                    formData.append('files', file, file.name);
+
+                    // Send each file via axios in parallel
+                    return axios.post('http://127.0.0.1:8000/api/upload', formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                        },
+                    });
                 });
-                console.log('Files uploaded successfully');
-                setIsUploading(false);
-                setIsLoading(false);
+
+                // Wait for all uploads to complete
+                await Promise.all(uploadPromises);
+
+                console.log('All files uploaded successfully');
+
                 if (redirectOnSuccess) {
                     router.push(redirectOnSuccess);
                 }
             } catch (error) {
-                console.error('Error uploading file', error);
+                console.error('Error uploading files', error);
                 setIsUploading(false);
-                setIsLoading(false);
             }
         }
+        setIsLoading(false);
     };
 
     return (
@@ -69,7 +66,7 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
                 ref={inputRef}
                 onChange={handleFileChange}
                 className="hidden"
-                accept=".cali" // Specify file types
+                accept=".cali" // Specify the accepted file types
             />
             {(!isLoading && uploadProgress !== 100) && (
                 <Button color="primary" onClick={handleButtonClick}>
