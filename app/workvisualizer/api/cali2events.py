@@ -80,6 +80,7 @@ import numpy as np
 import time
 import sys
 import os
+import io
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(script_dir, 'caliper-reader'))
@@ -647,7 +648,7 @@ class CaliTraceEventConverter:
 
 
 @log_timed()
-def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit: int = 5):
+def convert_cali_to_json(input_stream, files_dir: str, maximum_depth_limit: int = 5):
     cfg = {
         "pretty_print": True,
         "sync_timestamps": True,
@@ -661,9 +662,8 @@ def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit:
 
     begin = time.perf_counter()
 
-    for file in input_files:
-        with open(file) as input:
-            converter.read_and_sort(input)
+    input_str = input_stream.decode('utf-8')
+    converter.read_and_sort(io.StringIO(input_str))
 
     if cfg["sync_timestamps"]:
         ts = converter.start_timing("Syncing ...")
