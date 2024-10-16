@@ -347,7 +347,6 @@ def analyze_representative_rank():
         return None
 
     ranks = [extract_rank(filename) for filename in files]
-    print(f"ranks: {ranks}")
     file_name_template = str(
         os.path.abspath(os.path.join(events_dir, "events-{}-depth_5.json")))  # @todo fix this hardcoded depth
     feature_df = representativeRank.create_feature_dataframe(
@@ -450,26 +449,67 @@ def analyze_timeslices():
 
     rank_slice_time_lost, slice_time_lost = run_slice_analysis(files_dir, representative_rank, slices)
 
-    # Simplify rank slice time lost for now
-    simplified_rank_slice_time_lost = {}
-    for ranks_list in rank_slice_time_lost.values():
-        for ranks_dict in ranks_list:
-            simplified_rank_slice_time_lost[ranks_dict["slice"]] = {
-                ranks_dict['rank']: ranks_dict['time_lost']
-            }
+    print("\nARE WE HERE?\n")
+    # Only keep ranks within some threshold percentage of the total runtime
+    threshold_pct = 0.05
+    pct_of_runtime = threshold_pct * program_runtime
+    threshold_ranks = {}
+    most_time_lost = 0.0
+    most_time_losing_rank = 0
+    most_time_losing_rank_slice = 0
+    for entry in rank_slice_time_lost:
+        time_lost = entry["time_lost"]
+        rank = entry["rank"]
+        slice_id = entry["slice"]
+        if time_lost > most_time_lost:
+            most_time_lost = time_lost
+            most_time_losing_rank = rank
+            most_time_losing_rank_slice = slice_id
+        if time_lost / program_runtime > pct_of_runtime:
+            if slice_id not in threshold_ranks:
+                threshold_ranks[slice_id] = []
+            threshold_ranks[slice_id].append({"rank": rank, "time_lost": time_lost})
 
-    for slice_id in range(len(slices)):
-        if slice_id not in list(simplified_rank_slice_time_lost.keys()):
-            simplified_rank_slice_time_lost[slice_id] = {"": "No significant time-losing ranks in this slice."}
+    print("\nWHAT ABOUT HERE?\n")
+
+    # # Simplify rank slice time lost for now
+    # simplified_rank_slice_time_lost = {}
+    # for ranks_list in rank_slice_time_lost.values():
+    #     for ranks_dict in ranks_list:
+    #         simplified_rank_slice_time_lost[ranks_dict["slice"]] = {
+    #             ranks_dict['rank']: ranks_dict['time_lost']
+    #         }
+
+    # print("Printing simplified dict: ")
+    # for key, value in simplified_rank_slice_time_lost.items():
+    #     print(f" {key}: {value}")
+    # # print(simplified_rank_slice_time_lost)
+
+    # for slice_id in range(len(slices)):
+    #     if slice_id not in list(simplified_rank_slice_time_lost.keys()):
+    #         simplified_rank_slice_time_lost[slice_id] = {"": "No significant time-losing ranks in this slice."}
 
     # modify the slices so they have 'slice ...' as the key and the times are stores in the 'ts' sub-key
-    slices = {
-        i: {
+    modified_slices = {}
+    for i, slice_data in enumerate(slices):
+        print("slice_id: ", i)
+        modified_slices[i] = {
             "ts": [ts for ts in slice_data],
             "time_lost": f'{slice_time_lost[i]}',
-            "statistics": simplified_rank_slice_time_lost[i]
-        } for i, slice_data in enumerate(slices)
-    }
+            "most_time_losing_rank": most_time_losing_rank if i == most_time_losing_rank_slice else False,
+            "statistics": threshold_ranks[i] if i in threshold_ranks else {}
+        }
+
+    # modified_slices = {
+    #     i: {
+    #         "ts": [ts for ts in slice_data],
+    #         "time_lost": f'{slice_time_lost[i]}',
+    #         "most_time_losing_rank": most_time_losing_rank if i == most_time_losing_rank_slice else False,
+    #         "statistics": threshold_ranks[i]
+    #     } for i, slice_data in enumerate(slices)
+    # }
+
+    print("\nCreated slices\n")
 
     analysis_dir = os.path.join(files_dir, "analysis")
     # create the analysis directory if it does not exist
@@ -477,4 +517,5 @@ def analyze_timeslices():
     filename = f"timeslices.json"
     filepath = os.path.join(analysis_dir, filename)
     with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(slices, f, ensure_ascii=False, indent=4)
+        json.dump(modified_slices, f, ensure_ascii=False, indent=4)
+    print("\nWROTE OUT SLICES TO timeslices.json")

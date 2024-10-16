@@ -15,11 +15,8 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
     const inputRef = useRef<HTMLInputElement>(null);
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
-    const [isReading, setIsReading] = useState(false);
-    const [readingStatus, setReadingStatus] = useState(0);
-    const [numFiles, setNumFiles] = useState(0);
     const [isUploading, setIsUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(100);
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     const handleButtonClick = () => {
         inputRef.current?.click();
@@ -30,15 +27,11 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
         const files = event.target.files;
         if (files && files.length > 0) {
             const formData = new FormData();
-            setNumFiles(files.length);
-            setIsReading(true);
 
             for (let i = 0; i < files.length; i++) {
                 formData.append('files', files[i], files[i].name);
-                setReadingStatus(i + 1);
-                await new Promise(resolve => setTimeout(resolve, 100)); // Simulate reading delay
             }
-            setIsReading(false);
+
             setUploadProgress(0);
             setIsUploading(true); // Start upload
 
@@ -78,25 +71,15 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
                 className="hidden"
                 accept=".cali" // Specify file types
             />
-            {!isLoading ? (
+            {(!isLoading && uploadProgress !== 100) && (
                 <Button color="primary" onClick={handleButtonClick}>
                     Upload File(s)
                 </Button>
-            ) : null}
-
-            {isReading && (
-                <Progress
-                    label={isReading ? "Reading... (Step 1 of 3)" : "Reading complete."}
-                    value={readingStatus}
-                    maxValue={numFiles}
-                    className="max-w-md"
-                    style={{ width: '600px' }}
-                />
             )}
 
             {(isUploading && uploadProgress !== 100) && (
                 <Progress
-                    label={"Uploading... (Step 2 of 3)"}
+                    label={"Uploading... (Step 1 of 2)"}
                     value={uploadProgress}
                     color={"primary"}
                     maxValue={100}
@@ -105,9 +88,9 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
                 />
             )}
 
-            { (isLoading && !isReading && uploadProgress == 100) ?
+            { (isLoading && uploadProgress == 100) ?
                 (
-                    <CircularProgress size="lg" label="Finishing up... (Step 3 of 3)" />
+                    <CircularProgress size="lg" label="Finishing up... (Step 2 of 2)" />
                 )
                 : null
             }

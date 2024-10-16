@@ -449,7 +449,7 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, rank, timeSli
                 size="sm"
                 color="primary"
             >
-                Show Duration
+                Show Duration (Does not work with zoom)
             </Switch>
             <Spacer y={1}/>
             <div style={{ display: "flex", alignItems: "center" }}>

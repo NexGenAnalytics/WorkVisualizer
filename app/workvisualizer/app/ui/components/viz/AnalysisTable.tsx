@@ -31,15 +31,16 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
     let mostTimeLosingSlice = null;
     let maxTimeLost = Number.NEGATIVE_INFINITY;
     let totalTimeLost = 0.;
+    let numRanksWithSignificantTimeLost = 0;
 
     // Iterate through timeSlices to find the longest slice and most time-losing rank
-    for (const key in timeSlices) {
-        const slice = timeSlices[key];
+    for (const slice_id in timeSlices) {
+        const slice = timeSlices[slice_id];
         const sliceLength = slice.ts[1] - slice.ts[0];
 
         // Update longestSlice if the current slice is longer
         if (sliceLength > longestLength) {
-            longestSlice = key;
+            longestSlice = slice_id;
             longestLength = sliceLength;
         }
 
@@ -48,20 +49,38 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
         if (timeLostValue > maxTimeLost) {
             totalTimeLost += timeLostValue;
             maxTimeLost = timeLostValue;
-            mostTimeLosingSlice = key;
+            mostTimeLosingSlice = slice_id;
             timeLostByMostTimeLosingSlice = maxTimeLost;
         }
 
         // Check if there's a significant time-losing rank in statistics
-        for (const rank in slice.statistics) {
-            if (rank) { // Check if rank is not empty
-                mostTimeLosingRank = rank;
-                mostTimeLosingRankSlice = key;
-                timeLostByMostTimeLosingRank = Number(slice.statistics[rank]);
-                break; // Break after finding the first significant rank
+        // for (const rank in slice.statistics) {
+        //     if (rank) { // Check if rank is not empty
+        //         mostTimeLosingRank = rank;
+        //         mostTimeLosingRankSlice = slice_id;
+        //         timeLostByMostTimeLosingRank = Number(slice.statistics[rank]);
+        //         break; // Break after finding the first significant rank
+        //     }
+        // }
+
+        if (slice.most_time_losing_rank) {
+            mostTimeLosingRank = slice.most_time_losing_rank;
+            mostTimeLosingRankSlice = slice_id;
+            if (slice.statistics.length > 0) {
+                numRanksWithSignificantTimeLost += slice.statistics.length
             }
+
+            for (const rankTimeLost in slice.statistics) {
+                const rank = rankTimeLost["rank"];
+                if (rank == mostTimeLosingRank) {
+                    timeLostByMostTimeLosingRank = rankTimeLost["time_lost"];
+                }
+            }
+
         }
 
+        console.log("slice_id: ", slice_id)
+        console.log("numRanksWithSignificantTimeLost: ", numRanksWithSignificantTimeLost)
         console.log("mostTimeLosingRank: ", mostTimeLosingRank)
         console.log("timeLostByMostTimeLosingRank: ", timeLostByMostTimeLosingRank)
         console.log("timeLostByMostTimeLosingSlice: ", timeLostByMostTimeLosingSlice)
@@ -85,6 +104,10 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
                     <TableColumn>Statistic</TableColumn>
                 </TableHeader>
                 <TableBody>
+                    <TableRow key="0">
+                        <TableCell># of Ranks with Signficant Time Lost</TableCell>
+                        <TableCell>{numRanksWithSignificantTimeLost}</TableCell>
+                    </TableRow>
                     <TableRow key="1">
                         <TableCell>Most Time-Losing Slice</TableCell>
                         <TableCell>{mostTimeLosingSlice || 'None'}</TableCell>
@@ -97,14 +120,14 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
                         <TableCell>Longest Slice</TableCell>
                         <TableCell>{longestSlice}</TableCell>
                     </TableRow>
-                    {/* <TableRow key="4">
+                    <TableRow key="4">
                         <TableCell>{`% of Total Runtime Lost on Rank ${mostTimeLosingRank}`}</TableCell>
                         <TableCell>{formatPct(pctLostByMostTimeLosingRank)}%</TableCell>
                     </TableRow>
                     <TableRow key="5">
                         <TableCell>% of Total Runtime Lost Across All Ranks</TableCell>
                         <TableCell>{formatPct(pctLost)}%</TableCell>
-                    </TableRow> */}
+                    </TableRow>
                 </TableBody>
             </Table>
             {/* <h3>Time Lost Breakdown</h3>

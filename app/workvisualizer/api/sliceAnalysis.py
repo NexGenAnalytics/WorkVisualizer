@@ -56,7 +56,7 @@ def calculate_slice_stats(rank_slices):
         }
     return slice_stats
 
-def find_rank_slices_with_most_time_lost(all_slices, slice_id=None, num_entries=None):
+def sort_rank_slices_by_time_lost(all_slices, slice_id=None, num_entries=None):
 
     # Isolate only requested slice
     if slice_id is not None:
@@ -71,36 +71,36 @@ def find_rank_slices_with_most_time_lost(all_slices, slice_id=None, num_entries=
     all_slices.sort(key=lambda x: x["time_lost"], reverse=True)
 
     # Initialize ranks/slices with most time lost
-    most_time_lost = {}
+    # most_time_lost = {}
 
     # User specifies top num_entries
-    if num_entries is not None:
-        iter = 0
-        while iter < num_entries and iter < len(all_slices):
-            entry = all_slices[iter]
-            slice_id = entry["slice"]
-            if slice_id not in most_time_lost:
-                most_time_lost[slice_id] = []
-            most_time_lost[slice_id].append(entry)
-            iter += 1
+    # if num_entries is not None:
+    #     iter = 0
+    #     while iter < num_entries and iter < len(all_slices):
+    #         entry = all_slices[iter]
+    #         slice_id = entry["slice"]
+    #         if slice_id not in most_time_lost:
+    #             most_time_lost[slice_id] = []
+    #         most_time_lost[slice_id].append(entry)
+    #         iter += 1
 
-    # Determine some stat for reporting
-    else:
-        total_time_lost = sum(entry["time_lost"] for entry in all_slices)
-        mean_time_lost = total_time_lost / len(all_slices)
-        var = sum((entry["time_lost"] - mean_time_lost) ** 2 for entry in all_slices) / len(all_slices)
-        sigma = math.sqrt(var)
+    # # Determine some stat for reporting
+    # else:
+    #     total_time_lost = sum(entry["time_lost"] for entry in all_slices)
+    #     mean_time_lost = total_time_lost / len(all_slices)
+    #     var = sum((entry["time_lost"] - mean_time_lost) ** 2 for entry in all_slices) / len(all_slices)
+    #     sigma = math.sqrt(var)
 
-        # Look for slices greater than mean + 2*sigma
-        threshold_time_lost = mean_time_lost + 2 * sigma
-        for entry in all_slices:
-            if entry["time_lost"] > threshold_time_lost:
-                slice_id = entry["slice"]
-                if slice_id not in most_time_lost:
-                    most_time_lost[slice_id] = []
-                most_time_lost[slice_id].append(entry)
+    #     # Look for slices greater than mean + 2*sigma
+    #     threshold_time_lost = mean_time_lost + 2 * sigma
+    #     for entry in all_slices:
+    #         if entry["time_lost"] > threshold_time_lost:
+    #             slice_id = entry["slice"]
+    #             if slice_id not in most_time_lost:
+    #                 most_time_lost[slice_id] = []
+    #             most_time_lost[slice_id].append(entry)
 
-    return most_time_lost
+    return all_slices
 
 def find_time_losing_slices(all_slices):
     """Aggregates across all ranks to get the total time lost for each slice."""
@@ -111,8 +111,6 @@ def find_time_losing_slices(all_slices):
             total_time_lost_per_slice[slice_id] = entry['time_lost']
         else:
             total_time_lost_per_slice[slice_id] += entry['time_lost']
-        if slice_id == 3:
-            print(f"Time Lost: {total_time_lost_per_slice[slice_id]}")
     return total_time_lost_per_slice
 
 def process_file(filepath, repr_slice_stats, num_slices, slices):
@@ -243,7 +241,7 @@ def run_slice_analysis(files_dir, representative_rank, representative_slices):
     all_slices = analyze_slices(events_dir, representative_rank, representative_slices)
 
     # Isolate ranks that lose time
-    time_losing_rank_slices = find_rank_slices_with_most_time_lost(all_slices, num_entries=1)
+    time_losing_rank_slices = sort_rank_slices_by_time_lost(all_slices, num_entries=1)
 
     # Aggregate across all ranks to find time-losing slices
     time_losing_slices = find_time_losing_slices(all_slices)
