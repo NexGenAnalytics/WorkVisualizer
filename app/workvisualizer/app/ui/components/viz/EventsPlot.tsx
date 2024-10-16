@@ -1,20 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import {Accordion, AccordionItem} from "@nextui-org/accordion";
 import { CheckboxGroup, Checkbox, Switch, Spacer } from '@nextui-org/react';
 import { VisualizationProps } from '@/app/types';
+import EventsPlotHelpButton from '@/app/ui/components/help/EventsPlotHelpButton';
 
 interface EventsPlotProps extends VisualizationProps {
     start: number;
     end: number;
+    rank: string;
     timeSlices: any;
-    showSliceLines: boolean;
 }
 
-const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, showSliceLines }) => {
+const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, rank, timeSlices }) => {
     const ref = useRef();
     const [visibleTypes, setVisibleTypes] = useState(["mpi_collective", "mpi_p2p", "kokkos", "other"]);
     const [filteredData, setFilteredData] = useState(data);
     const [showDuration, setShowDuration] = useState(false);
+    const [showSlices, setShowSlices] = useState(false);
+
+    // Determine if time slices are available
+    const hasTimeSlices = timeSlices && Object.keys(timeSlices).length > 0;
 
     // Update filteredData when visibleTypes change
     useEffect(() => {
@@ -259,7 +265,7 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, s
         // Stack to keep track of zoom states
         let zoomStack = [];
 
-        if (showSliceLines && timeSlices) {
+        if (showSlices && hasTimeSlices) {
             svg.append("g")
                 .selectAll("line")
                 .data(Object.values(timeSlices))
@@ -403,18 +409,27 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, s
         }
 
 
-    }, [filteredData, showDuration, showSliceLines, timeSlices]);
+    }, [filteredData, showDuration, rank, showSlices, timeSlices, start, end]);
 
     const handleCheckboxChange = (values) => {
         setVisibleTypes(values);
     };
 
-    const handleToggleChange = () => {
+    const handleShowDurationChange = () => {
         setShowDuration(prevState => !prevState);
+    };
+
+    const handleShowSlicesChange = () => {
+        setShowSlices(prevState => !prevState);
     };
 
     return (
         <div>
+            <div style={{ display: "flex", alignItems: "center" }}>
+                <h2 style={{ fontSize: '1.5rem', margin: '1rem 0', fontWeight: 'bold' }}>Events Plot</h2>
+                <Spacer x={2}/>
+                <EventsPlotHelpButton/>
+            </div>
             <CheckboxGroup
                 size="sm"
                 orientation="horizontal"
@@ -430,13 +445,30 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, s
             <Spacer y={5} />
             <Switch
                 checked={showDuration}
-                onChange={handleToggleChange}
+                onChange={handleShowDurationChange}
                 size="sm"
                 color="primary"
             >
                 Show Duration
             </Switch>
+            <Spacer y={1}/>
+            <div style={{ display: "flex", alignItems: "center" }}>
+                <Switch
+                    checked={showSlices}
+                    isDisabled={!hasTimeSlices}
+                    onChange={handleShowSlicesChange}
+                    size="sm"
+                    color="primary"
+                >
+                    {hasTimeSlices
+                        ? "Show Time Slices"
+                        : "Show Time Slices (Requires Analysis)"
+                    }
+                </Switch>
+            </div>
+            <Spacer y={5}/>
             <svg ref={ref} width={928} height={600} />
+            <p><i>Rank {rank}</i></p>
         </div>
     );
 };

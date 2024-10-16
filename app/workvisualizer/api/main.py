@@ -224,6 +224,23 @@ def get_eventsplot_data(depth, rank):
 
     return get_data_from_json(filepath)
 
+# Does not use rank or depth for now
+@app.get("/api/analysisviewer/{depth}/{rank}")
+@log_timed()
+def get_analysisviewer_data(depth, rank):
+    analysis_dir = os.path.join(files_dir, "analysis")
+
+    filename = f"all_ranks_analyzed.json"
+    filepath = os.path.join(analysis_dir, filename)
+
+    if not os.path.isfile(filepath):
+        print(f"Did not find {filepath}.")
+        return None
+
+    print("Reading and returning analysis data")
+
+    # Read in the data
+    return get_data_from_json(filepath)
 
 # @app.get("/api/hierarchy/{rank}")
 # def get_hierarchy_data(rank):
@@ -438,7 +455,7 @@ def analyze_timeslices():
     for ranks_list in rank_slice_time_lost.values():
         for ranks_dict in ranks_list:
             simplified_rank_slice_time_lost[ranks_dict["slice"]] = {
-                f"Rank {ranks_dict['rank']}": f"Lost the most time ({abs(ranks_dict['time_lost']):2f} seconds slower than the representative rank)" for ranks_dict in ranks_list
+                ranks_dict['rank']: ranks_dict['time_lost']
             }
 
     for slice_id in range(len(slices)):
@@ -449,7 +466,7 @@ def analyze_timeslices():
     slices = {
         i: {
             "ts": [ts for ts in slice_data],
-            "time_lost": f'{slice_time_lost[i]/num_ranks:2f}',
+            "time_lost": f'{slice_time_lost[i]}',
             "statistics": simplified_rank_slice_time_lost[i]
         } for i, slice_data in enumerate(slices)
     }

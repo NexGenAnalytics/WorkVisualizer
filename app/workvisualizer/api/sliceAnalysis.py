@@ -68,7 +68,7 @@ def find_rank_slices_with_most_time_lost(all_slices, slice_id=None, num_entries=
             raise TypeError("slice_id should be an int or list of ints")
 
     # Sort the list by the time lost (in descending order)
-    all_slices.sort(key=lambda x: x["time_lost"])
+    all_slices.sort(key=lambda x: x["time_lost"], reverse=True)
 
     # Initialize ranks/slices with most time lost
     most_time_lost = {}
@@ -108,9 +108,11 @@ def find_time_losing_slices(all_slices):
     for entry in all_slices:
         slice_id = entry['slice']
         if slice_id not in total_time_lost_per_slice:
-            total_time_lost_per_slice[entry['slice']] = entry['time_lost']
+            total_time_lost_per_slice[slice_id] = entry['time_lost']
         else:
-            total_time_lost_per_slice[entry['slice']] += entry['time_lost']
+            total_time_lost_per_slice[slice_id] += entry['time_lost']
+        if slice_id == 3:
+            print(f"Time Lost: {total_time_lost_per_slice[slice_id]}")
     return total_time_lost_per_slice
 
 def process_file(filepath, repr_slice_stats, num_slices, slices):
@@ -150,7 +152,7 @@ def process_file(filepath, repr_slice_stats, num_slices, slices):
     for slice_id in slice_ids:
 
         # First, calculate the time lost in Allreduce functions
-        time_lost = slice_stats[slice_id]["type times"]["mpi_collective"] - repr_slice_stats[slice_id]["type times"]["mpi_collective"]
+        time_lost = repr_slice_stats[slice_id]["type times"]["mpi_collective"] - slice_stats[slice_id]["type times"]["mpi_collective"]
 
         # Compute percent difference for total number of events
         repr_num_events = repr_slice_stats[slice_id]["num_events"]
@@ -249,6 +251,10 @@ def run_slice_analysis(files_dir, representative_rank, representative_slices):
     # Create the analysis dir (if it doesn't exist)
     analysis_dir = os.path.join(files_dir, "analysis")
     os.makedirs(analysis_dir, exist_ok=True)
+
+    # Write out the data for all ranks
+    with open(os.path.join(analysis_dir, "all_ranks_analyzed.json"), "w") as all_ranks_json:
+        json.dump(all_slices, all_ranks_json, indent=4)
 
     # Write out the data for time-losing ranks
     with open(os.path.join(analysis_dir, "time_lost_ranks.json"), "w") as ranks_json:
