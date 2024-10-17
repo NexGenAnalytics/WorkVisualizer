@@ -21,6 +21,9 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
     const numRanks = summaryData["mpi.world.size"];
     const totalRuntime = summaryData["program.runtime"]
 
+    // Determine the threshold for a "signficant" number of lossy ranks
+    const signficantThreshold = numRanks * 0.1
+
     // Calculate the longest slice and the most time-losing rank
     let longestSlice = null;
     let longestLength = 0.;
@@ -63,7 +66,7 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
         //     }
         // }
 
-        if (slice.most_time_losing_rank) {
+        if (Number(slice.most_time_losing_rank) >= 0) {
             mostTimeLosingRank = slice.most_time_losing_rank;
             mostTimeLosingRankSlice = slice_id;
             if (slice.statistics.length > 0) {
@@ -96,7 +99,14 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
                 hideHeader
                 removeWrapper
                 selectionMode="single"
-                defaultSelectedKeys={[]}
+                selectedKeys={["0"]}
+                color={
+                    numRanksWithSignificantTimeLost === 0
+                    ? "success"
+                    : numRanksWithSignificantTimeLost <= signficantThreshold
+                    ? "warning"
+                    : "danger"
+                }   
                 aria-label="Analysis Summary"
             >
                 <TableHeader>

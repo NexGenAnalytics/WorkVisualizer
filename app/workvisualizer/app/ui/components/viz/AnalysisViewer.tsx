@@ -67,7 +67,7 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
 
         const width = 800;
         const height = 300;
-        const margin = { top: 30, right: 200, bottom: 55, left: 80 };
+        const margin = { top: 30, right: 80, bottom: 55, left: 80 };
 
         const xScale = d3.scaleBand()
             .domain(data.map(d => d.id)) // use slice id as the domain
@@ -122,7 +122,7 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
             .enter()
             .append('rect')
             .attr('x', d => xScale(d.id)!)
-            .attr('y', d => yScale(d.time_lost))
+            .attr('y', d => yScale(Math.max(0, d.time_lost)))
             .attr('width', xScale.bandwidth())
             .attr('height', d => height - margin.bottom - yScale(d.time_lost))
             .attr('fill', d => showTimeLostPerSlice && selectedSlice == Number(d.id) ? selectedBarColor : barColor)
@@ -181,7 +181,7 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
 
         const width = 800;
         const height = 300;
-        const margin = { top: 30, right: 200, bottom: 40, left: 80 };
+        const margin = { top: 30, right: 80, bottom: 40, left: 80 };
 
         const xScale = d3.scaleBand()
             .domain(topRanks.map(d => d.rank.toString()))
@@ -208,8 +208,8 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
             .attr("stroke-dasharray", "4");
 
         svg.append("text")
-            .attr("x", width - margin.right + 5) // Positioning to the right of the line
-            .attr("y", yScale(totalRuntime) + 5) // Positioning slightly above the line
+            .attr("x", width - margin.right - 160) // Positioning to the right of the line
+            .attr("y", yScale(totalRuntime) - 5) // Positioning slightly above the line
             .attr("fill", selectedBarColor)
             .style("font-size", "12px")
             .style("font-family", "sans-serif")

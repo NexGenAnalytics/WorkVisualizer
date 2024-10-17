@@ -458,7 +458,7 @@ def analyze_timeslices():
         modified_slices[i] = {
             "ts": [ts for ts in slice_data],
             "time_lost": f'{slice_time_lost[i]}',
-            "most_time_losing_rank": most_time_losing_rank if i == most_time_losing_rank_slice else False,
+            "most_time_losing_rank": most_time_losing_rank if i == most_time_losing_rank_slice else -1,
             "statistics": threshold_ranks[i] if i in threshold_ranks else {}
         }
 

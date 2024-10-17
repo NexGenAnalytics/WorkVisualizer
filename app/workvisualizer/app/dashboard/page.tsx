@@ -376,8 +376,6 @@ export default function Page() {
                                             <div style={{ display: 'flex', alignItems: 'center' }}>
                                                 <Spacer x={1}/>
                                                 Slice Explorer
-                                                <Spacer x={3}/>
-                                                <AnalysisHelpButton fromAnalysisTab={false}/>
                                             </div>
                                         }
                                         key="1"
@@ -385,10 +383,15 @@ export default function Page() {
                                         {timeSlices && (
                                             <>
                                                 <Input
-                                                    label="Enter slice name"
+                                                    label={selectedSlice in Object.keys(timeSlices) || selectedSlice == ""
+                                                            ? "Enter slice name"
+                                                            : `Enter slice from 0 - ${Object.keys(timeSlices).length - 1}`}
                                                     type="number"
-                                                    placeholder="Enter slice name"
+                                                    placeholder={`Enter slice from 0 - ${Object.keys(timeSlices).length - 1}`}
                                                     value={selectedSlice || ""}
+                                                    color={selectedSlice in Object.keys(timeSlices) || selectedSlice == ""
+                                                            ? "default"
+                                                            : "danger"}
                                                     onChange={(e) => {
                                                         const current_slice = e.target.value
                                                         setSelectedSlice(current_slice);
