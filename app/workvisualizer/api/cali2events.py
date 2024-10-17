@@ -202,7 +202,7 @@ class CaliTraceEventConverter:
         'pthread.id',
     ]
 
-    def __init__(self, cfg, maximum_depth_limit=5):
+    def __init__(self, cfg):
         self.cfg = cfg
 
         self.records = []
@@ -221,9 +221,6 @@ class CaliTraceEventConverter:
 
         self.skipped = 0
         self.written = 0
-
-        # Filtering data
-        self.maximum_depth_limit = maximum_depth_limit
 
         # These keep track of metadata
         # TODO: there must be a cleaner way to do this
@@ -271,17 +268,15 @@ class CaliTraceEventConverter:
     @log_timed()
     def write(self, files_dir):
 
-        proc_id = ''.join(map(str, self.known_ranks[:3]))
+        proc_ids = ''.join(map(str, self.known_ranks[:3]))
 
-        depth_desc = "depth_full" if self.maximum_depth_limit is None else f"depth_{self.maximum_depth_limit}"
-        event_output_files = {rank: os.path.join(files_dir, "events", f"events-{rank}-{depth_desc}.json") for rank in
+        event_output_files = {rank: os.path.join(files_dir, "events", f"events-{rank}.json") for rank in
                               self.known_ranks}
         unique_events_output_files = {
-            rank: os.path.join(files_dir, "unique-events", f"unique-events-{rank}-{depth_desc}.json") for rank in
+            rank: os.path.join(files_dir, "unique-events", f"unique-events-{rank}.json") for rank in
             self.known_ranks}
-        metadata_proc_output_file = os.path.join(files_dir, "metadata", "procs", f"metadata-{proc_id}-{depth_desc}.json")
-        metadata_output_file = os.path.join(files_dir, "metadata", f"metadata-{depth_desc}.json")
-        unique_events_output_file = os.path.join(files_dir, "unique-events", f"unique-events-all-{depth_desc}.json")
+        metadata_proc_output_file = os.path.join(files_dir, "metadata", "procs", f"metadata-{proc_ids}.json")
+        unique_events_output_file = os.path.join(files_dir, "unique-events", f"unique-events-all.json")
 
         # if len(self.stackframes.nodes) > 0:
         #     result["stackFrames"] = self.stackframes.get_stackframes()
@@ -418,15 +413,13 @@ class CaliTraceEventConverter:
     def filter_rec(self, key, rec):
         keys = list(rec.keys())
         kernel_type_filter = "kernel_type" in keys and "kokkos.fence" in rec["kernel_type"]
-        depth_filter = key.startswith("event.begin#") and len(rec.get("path", [])) >= int(self.maximum_depth_limit) or \
-                       key.startswith("event.end#") and len(rec.get("path", [])) - 1 >= int(self.maximum_depth_limit)
 
         if key.startswith("event.begin#"):
             depth = len(rec.get("path", []))
             if depth not in self.known_depths and depth > 0:
                 self.known_depths.append(depth)
 
-        return kernel_type_filter or depth_filter
+        return kernel_type_filter
 
     def _process_record(self, rec):
         pid = int(_get_first_from_list(rec, self.pid_attributes))
@@ -647,7 +640,7 @@ class CaliTraceEventConverter:
 
 
 @log_timed()
-def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit: int = 5):
+def convert_cali_to_json(input_files: list, files_dir: str):
     cfg = {
         "pretty_print": True,
         "sync_timestamps": True,
@@ -657,7 +650,7 @@ def convert_cali_to_json(input_files: list, files_dir: str, maximum_depth_limit:
         "verbose": False
     }
 
-    converter = CaliTraceEventConverter(cfg, maximum_depth_limit)
+    converter = CaliTraceEventConverter(cfg)
 
     begin = time.perf_counter()
 

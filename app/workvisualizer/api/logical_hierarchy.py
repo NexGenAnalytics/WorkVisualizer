@@ -38,8 +38,9 @@ import json
 
 class LogicalHierarchy:
 
-    def __init__(self, events_file, ftn_id: int = -1):
+    def __init__(self, events_file, ftn_id: int = -1, maximum_depth: int = -1):
         self.ftn_id = "" if ftn_id == -1 else ftn_id
+        self.maximum_depth = maximum_depth
         self.root_name = ""
         self.handled_events = []
 
@@ -64,6 +65,9 @@ class LogicalHierarchy:
     def create_hierarchy(self):
         found_root = True if self.ftn_id == "" else False
         for event in self.unique_events:
+
+            if int(event["depth"]) + 1 >= self.maximum_depth:
+                continue
 
             if event["ftn_id"] == self.ftn_id:
                 self.hierarchy = event
@@ -101,7 +105,6 @@ class LogicalHierarchy:
                         target_idx = path_splits.index(self.root_name)
                         path_splits = path_splits[target_idx:]
                     for path_step in path_splits:
-                        names_of_current_list = [e["name"] for e in current_list]
                         for parent in current_list:
                             if parent["name"] == path_step:
                                 if iter == len(path_splits):
@@ -114,8 +117,8 @@ class LogicalHierarchy:
 
         return self.hierarchy
 
-def generate_logical_hierarchy_from_root(events_file, output_file, ftn_id: int = -1):
-    hierarchy_generator = LogicalHierarchy(events_file, ftn_id)
+def generate_logical_hierarchy_from_root(events_file, output_file, ftn_id: int = -1, depth: int = -1):
+    hierarchy_generator = LogicalHierarchy(events_file, ftn_id, maximum_depth=depth)
     hierarchy = hierarchy_generator.create_hierarchy()
 
     logical_dir = os.path.dirname(output_file)
