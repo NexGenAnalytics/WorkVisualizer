@@ -82,7 +82,7 @@ export default function Page() {
         // API formatting: /api/{component}/({root})/{depth}/{rank}
         //   Defaults:
         //      root (only for hierarchies): -1 (shows entire available tree)
-        //      depth:                        5 (only parses records with path depth < 5)
+        //      depth:                        5 (show records with path depth < 5)
         //      rank:                         0 (default to rank 0)
         { key: 'callTree', plot: { label: 'Call Tree', endpoint: '/api/logical_hierarchy/-1/5/0' } },
         { key: 'proportionAnalyzer', plot: { label: 'Proportion Analyzer', endpoint: '/api/logical_hierarchy/-1/5/0'} },

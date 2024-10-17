@@ -1,7 +1,6 @@
 """Aggregates data from each processor's metadata files into a single, global metadata file."""
 import os
 import json
-# imoprt numpy as np
 
 def read_in_proc_metadata_files(files_dir):
     metadata_proc_dir = os.path.join(files_dir, "metadata", "procs")
@@ -104,19 +103,15 @@ def aggregate_all_proc_metadata(list_of_proc_metadata_files):
     # Return the global metadata
     return global_metadata
 
-def write_out_global_metadata(data, files_dir, depth_string, indent=0):
+def write_out_global_metadata(data, files_dir, indent=0):
     metadata_dir = os.path.join(files_dir, "metadata")
-    metadata_file = os.path.join(metadata_dir, f"metadata-{depth_string}.json")
+    metadata_file = os.path.join(metadata_dir, f"metadata.json")
 
     with open(metadata_file, "w") as global_metadata_output:
         json.dump(data, global_metadata_output, indent=indent)
 
 def aggregate_metadata(files_dir):
-    print("CALLING AGGREGATE METADATA")
     proc_metadata_files = read_in_proc_metadata_files(files_dir)
     global_metadata = aggregate_all_proc_metadata(proc_metadata_files)
-
-    depth_level = proc_metadata_files[0].split("depth_")[1].split(".")[0]
-    depth_str = f"depth_{depth_level}"
-    write_out_global_metadata(global_metadata, files_dir, depth_str, 4)
+    write_out_global_metadata(global_metadata, files_dir, 4)
 
