@@ -248,7 +248,7 @@ export default function Page() {
                         </Tab>
                         <Tab key="analysis" title="Analysis">
                             <Card>
-                                {timeSlices !== null && timeSlices !== undefined ?
+                                {timeSlices !== null && timeSlices !== undefined && (
                                     <div style={{ display: 'flex', alignItems: 'center' }}>
                                         <Spacer x={3} y={2}/>
                                         <h3 style={{ fontSize: '1.0rem', margin: '1rem 0', fontWeight: 'bold' }}>
@@ -258,8 +258,7 @@ export default function Page() {
                                         <AnalysisResultsHelpButton/>
                                         <Spacer y={2}/>
                                     </div>
-                                    : null
-                                }
+                                )}
                                 {timeSlices !== null && timeSlices !== undefined ?
                                     <AnalysisTable
                                         timeSlices={timeSlices}
@@ -288,13 +287,12 @@ export default function Page() {
                                     </div>
                                 }
                                 <Spacer y={5}/>
-                                {timeSlices !== null && timeSlices !== undefined ?
+                                {timeSlices !== null && timeSlices !== undefined && (
                                     <div style={{ display: 'flex', alignItems: 'center' }}>
                                         <Spacer x={2}/>
                                         <p style={{ fontSize: '15px' }}><i>Tip: Visualize these results with the Analysis Viewer in the visualizations dropdown.</i></p>
                                     </div>
-                                    : null
-                                }
+                                )}
                                 <Spacer y={2}/>
                             </Card>
                         </Tab>

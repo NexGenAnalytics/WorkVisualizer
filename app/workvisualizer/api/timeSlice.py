@@ -75,6 +75,12 @@ def define_slices(df: pd.DataFrame, total_runtime: float):
     # Handle the final slice
     slices.append((start_time, total_runtime))
 
-    slices[0] = (0, slices[1][0])
+    slices[0] = (0.0, slices[1][0])
+
+    # Assert that the slices do not overlap at all
+    for i in range(len(slices)):
+        if i == 0:
+            assert slices[i][0] == 0.0
+        assert slices[i][0] >= slices[i-1][1]
 
     return slices
