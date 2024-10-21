@@ -433,7 +433,6 @@ def analyze_timeslices():
 
     # Only keep ranks within some threshold percentage of the total runtime
     threshold_pct = 0.05
-    pct_of_runtime = threshold_pct * program_runtime
     threshold_ranks = {}
     most_time_lost = 0.0
     most_time_losing_rank = 0
@@ -446,7 +445,7 @@ def analyze_timeslices():
             most_time_lost = time_lost
             most_time_losing_rank = rank
             most_time_losing_rank_slice = slice_id
-        if time_lost / program_runtime > pct_of_runtime:
+        if time_lost / program_runtime > threshold_pct:
             if slice_id not in threshold_ranks:
                 threshold_ranks[slice_id] = []
             threshold_ranks[slice_id].append({"rank": rank, "time_lost": time_lost})

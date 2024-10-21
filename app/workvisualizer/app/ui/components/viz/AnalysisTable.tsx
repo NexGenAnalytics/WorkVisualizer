@@ -56,16 +56,6 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
             timeLostByMostTimeLosingSlice = maxTimeLost;
         }
 
-        // Check if there's a significant time-losing rank in statistics
-        // for (const rank in slice.statistics) {
-        //     if (rank) { // Check if rank is not empty
-        //         mostTimeLosingRank = rank;
-        //         mostTimeLosingRankSlice = slice_id;
-        //         timeLostByMostTimeLosingRank = Number(slice.statistics[rank]);
-        //         break; // Break after finding the first significant rank
-        //     }
-        // }
-
         if (Number(slice.most_time_losing_rank) >= 0) {
             mostTimeLosingRank = slice.most_time_losing_rank;
             mostTimeLosingRankSlice = slice_id;
@@ -73,7 +63,7 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
                 numRanksWithSignificantTimeLost += slice.statistics.length
             }
 
-            for (const rankTimeLost in slice.statistics) {
+            for (const rankTimeLost of slice.statistics) {
                 const rank = rankTimeLost["rank"];
                 if (rank == mostTimeLosingRank) {
                     timeLostByMostTimeLosingRank = rankTimeLost["time_lost"];
@@ -81,12 +71,6 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
             }
 
         }
-
-        console.log("slice_id: ", slice_id)
-        console.log("numRanksWithSignificantTimeLost: ", numRanksWithSignificantTimeLost)
-        console.log("mostTimeLosingRank: ", mostTimeLosingRank)
-        console.log("timeLostByMostTimeLosingRank: ", timeLostByMostTimeLosingRank)
-        console.log("timeLostByMostTimeLosingSlice: ", timeLostByMostTimeLosingSlice)
     }
 
     const pctLost = ( totalTimeLost / numRanks ) / totalRuntime
@@ -106,7 +90,7 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
                     : numRanksWithSignificantTimeLost <= signficantThreshold
                     ? "warning"
                     : "danger"
-                }   
+                }
                 aria-label="Analysis Summary"
             >
                 <TableHeader>
