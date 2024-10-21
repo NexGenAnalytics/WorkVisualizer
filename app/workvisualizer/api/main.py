@@ -35,13 +35,14 @@
 from logging_utils.logging_utils import log_timed, set_log_level
 from cali2events import convert_cali_to_json
 from sliceAnalysis import run_slice_analysis
-from events2hierarchy import events_to_hierarchy
 from aggregateMetadata import aggregate_metadata
 from logical_hierarchy import generate_logical_hierarchy_from_root
 import representativeRank
 import timeSlice
 
+import asyncio
 import json
+import io
 import mmap
 import os
 import sys
@@ -85,9 +86,6 @@ def create_files_directory(files_directory):
     """Creates all directories that are used by WV."""
     os.makedirs(files_directory, exist_ok=True)
 
-    cali_dir = os.path.join(files_directory, "cali")
-    os.makedirs(cali_dir, exist_ok=True)
-
     events_dir = os.path.join(files_directory, "events")
     os.makedirs(events_dir, exist_ok=True)
 
@@ -129,54 +127,49 @@ def chunk_list(lst, chunk_size):
     for i in range(0, len(lst), chunk_size):
         yield lst[i:i + chunk_size]
 
-
-def process_chunk(chunk, files_dir, maximum_depth_limit):
-    convert_cali_to_json(chunk, files_dir, maximum_depth_limit)
-
-
 @log_timed()
-def unpack_cali(maximum_depth_limit=None):
-    cali_dir = os.path.join(files_dir, "cali")
-    input_files = [os.path.join(cali_dir, filename) for filename in os.listdir(cali_dir) if filename.endswith(".cali")]
-
-    if len(input_files) == 0:
-        return {"message": "No input .cali file was found."}
-
+def unpack_cali(input_data, maximum_depth_limit=5):
     # Determine the number of CPU cores
     num_cores = os.cpu_count()
-    chunk_size = max(1, len(input_files) // num_cores)  # Adjust chunk size based on the number of CPU cores
-
-    chunks = list(chunk_list(input_files, chunk_size))
+    chunk_size = max(1, len(input_data) // num_cores)  # Adjust chunk size based on the number of CPU cores
+    chunks = list(chunk_list(input_data, chunk_size))
 
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        futures = [executor.submit(process_chunk, chunk, files_dir, maximum_depth_limit) for chunk in chunks]
+        futures = [executor.submit(convert_cali_to_json, chunk, files_dir, maximum_depth_limit) for chunk in chunks]
         for future in concurrent.futures.as_completed(futures):
             future.result()
 
     aggregate_metadata(files_dir)
-    remove_existing_files(os.path.join(files_dir, "metadata", "procs"))
+    # remove_existing_files(os.path.join(files_dir, "metadata", "procs"))
 
+
+@app.post("/api/clear")
+async def clear_files_dir():
+    remove_existing_files(files_dir)
+    create_files_directory(files_dir)
 
 @app.post("/api/upload")
 async def upload_cali_files(files: List[UploadFile] = File(...)):
-    remove_existing_files(files_dir)
-    create_files_directory(files_dir)
-    cali_dir = os.path.join(files_dir, "cali")
-
+    print(f"len(uploaded_files): {len(files)}")
+    all_cali_data = []
     for file in files:
+        print("file")
         try:
+            print("try file")
             contents = await file.read()
-            with open(f"{cali_dir}/{file.filename}", "wb") as f:
-                f.write(contents)
+            all_cali_data.append(contents)
         except Exception as e:
             return {"message": f"There was an error uploading {file.filename}: {e}"}
         finally:
             await file.close()
 
-    unpack_cali(maximum_depth_limit=5)
+    await asyncio.to_thread(unpack_cali, all_cali_data, 5)
 
     return {"message": "Successfully uploaded files."}
 
+# @app.post("/api/unpack")
+# def unpack_endpoint():
+#     unpack_cali(maximum_depth_limit=5)
 
 # This endpoint doesn't use the rank at all for now
 @app.get("/api/metadata/{depth}/{rank}")
@@ -188,8 +181,8 @@ def get_metadata(depth):
     filename = f"metadata-{depth_desc}.json"
     filepath = os.path.join(metadata_dir, filename)
 
-    if not os.path.isfile(filepath):
-        unpack_cali(maximum_depth_limit=depth)
+    # if not os.path.isfile(filepath):
+    #     unpack_cali(maximum_depth_limit=depth)
 
     return get_data_from_json(filepath)
 
@@ -208,36 +201,22 @@ def get_eventsplot_data(depth, rank):
                 at_least_one_file = True
                 all_rank_data.extend(get_data_from_json(os.path.join(events_dir, file)))
 
-        if not at_least_one_file:
-            unpack_cali(maximum_depth_limit=depth)
-            at_least_one_file = True
+        # if not at_least_one_file:
+        #     unpack_cali(maximum_depth_limit=depth)
+        #     at_least_one_file = True
 
         return all_rank_data
 
     filename = f"events-{rank}-{depth_desc}.json"
     filepath = os.path.join(events_dir, filename)
 
-    if not os.path.isfile(filepath):
-        unpack_cali(maximum_depth_limit=depth)
+    # if not os.path.isfile(filepath):
+    #     unpack_cali(maximum_depth_limit=depth)
 
     # TODO: Add check for rank
 
     return get_data_from_json(filepath)
 
-
-# @app.get("/api/hierarchy/{rank}")
-# def get_hierarchy_data(rank):
-#     filename = f"hierarchy-{rank}.json"
-#     filepath = os.path.join(files_dir, filename)
-
-#     events_file = os.path.join(files_dir, f"events-{rank}.json")
-
-#     if not os.path.isfile(filepath):
-#         if not os.path.isfile(events_file):
-#             unpack_cali()
-#         events_to_hierarchy(events_file, filepath)
-
-#     return get_data_from_json(filepath)
 
 @app.get("/api/logical_hierarchy/{ftn_id}/{depth}/{rank}")
 @log_timed()
@@ -253,8 +232,8 @@ def get_logical_hierarchy_data(ftn_id, depth, rank):
 
     unique_events_file = os.path.join(unique_dir, f"unique-events-{rank}-{depth_desc}.json")
     if not os.path.isfile(filepath):
-        if not os.path.isfile(unique_events_file):
-            unpack_cali(maximum_depth_limit=depth)
+        # if not os.path.isfile(unique_events_file):
+        #     unpack_cali(maximum_depth_limit=depth)
 
         # TODO: Add check for rank
         generate_logical_hierarchy_from_root(unique_events_file, filepath, ftn_id=int(ftn_id))
@@ -430,7 +409,6 @@ def analyze_timeslices():
     program_runtime = metadata['program.runtime']
     num_ranks = int(metadata['mpi.world.size'])
     slices = timeSlice.define_slices(clustered_df, total_runtime=program_runtime)
-
     rank_slice_time_lost, slice_time_lost = run_slice_analysis(files_dir, representative_rank, slices)
 
     # Simplify rank slice time lost for now
@@ -446,7 +424,7 @@ def analyze_timeslices():
             simplified_rank_slice_time_lost[slice_id] = {"": "No significant time-losing ranks in this slice."}
 
     # modify the slices so they have 'slice ...' as the key and the times are stores in the 'ts' sub-key
-    slices = {
+    reformatted_slices = {
         i: {
             "ts": [ts for ts in slice_data],
             "time_lost": f'{slice_time_lost[i]/num_ranks:2f}',
@@ -460,4 +438,4 @@ def analyze_timeslices():
     filename = f"timeslices.json"
     filepath = os.path.join(analysis_dir, filename)
     with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(slices, f, ensure_ascii=False, indent=4)
+        json.dump(reformatted_slices, f, ensure_ascii=False, indent=4)
