@@ -30,10 +30,12 @@ class TestConfig(unittest.TestCase):
         # Read in the cali files
         cali_files = [os.path.join(self.cali_dir, filename) for filename in os.listdir(self.cali_dir) if
                       filename.endswith(".cali")]
+        all_cali_data = []
         for cali in cali_files:
             with open(cali, "rb") as cali_binary:
                 cali_stream = cali_binary.read()
-                convert_cali_to_json(cali_stream, self.data_dir, maximum_depth_limit=2)
+                all_cali_data.append(cali_stream)
+        convert_cali_to_json(all_cali_data, self.data_dir, maximum_depth_limit=2)
         aggregate_metadata(self.data_dir)
 
         # Now test that the logical hierarchy is created correctly

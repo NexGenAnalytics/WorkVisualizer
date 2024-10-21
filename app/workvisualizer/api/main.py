@@ -40,6 +40,7 @@ from logical_hierarchy import generate_logical_hierarchy_from_root
 import representativeRank
 import timeSlice
 
+import asyncio
 import json
 import io
 import mmap
@@ -139,46 +140,38 @@ def chunk_list(lst, chunk_size):
     for i in range(0, len(lst), chunk_size):
         yield lst[i:i + chunk_size]
 
-
-# def process_chunk(chunk, files_dir, maximum_depth_limit):
-    # convert_cali_to_json(chunk, files_dir, maximum_depth_limit)
-
-
 @log_timed()
-def unpack_cali(cali_stream, maximum_depth_limit=None):
-    # cali_dir = os.path.join(files_dir, "cali")
-    # input_files = [os.path.join(cali_dir, filename) for filename in os.listdir(cali_dir) if filename.endswith(".cali")]
+def unpack_cali(input_data, maximum_depth_limit=5):
+    # Determine the number of CPU cores
+    num_cores = os.cpu_count()
+    chunk_size = max(1, len(input_data) // num_cores)  # Adjust chunk size based on the number of CPU cores
+    chunks = list(chunk_list(input_data, chunk_size))
 
-    # if len(input_files) == 0:
-    #     return {"message": "No input .cali file was found."}
-
-    # # Determine the number of CPU cores
-    # num_cores = os.cpu_count()
-    # chunk_size = max(1, len(input_files) // num_cores)  # Adjust chunk size based on the number of CPU cores
-
-    # chunks = list(chunk_list(input_files, chunk_size))
-
-    # with concurrent.futures.ProcessPoolExecutor() as executor:
-    #     futures = [executor.submit(process_chunk, chunk, files_dir, maximum_depth_limit) for chunk in chunks]
-    #     for future in concurrent.futures.as_completed(futures):
-    #         future.result()
-
-    convert_cali_to_json(cali_stream, files_dir, maximum_depth_limit)
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = [executor.submit(convert_cali_to_json, chunk, files_dir, maximum_depth_limit) for chunk in chunks]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
 
     aggregate_metadata(files_dir)
-    remove_existing_files(os.path.join(files_dir, "metadata", "procs"))
+    # remove_existing_files(os.path.join(files_dir, "metadata", "procs"))
 
 
 @app.post("/api/upload")
 async def upload_cali_files(files: List[UploadFile] = File(...)):
+    print(f"len(uploaded_files): {len(files)}")
+    all_cali_data = []
     for file in files:
+        print("file")
         try:
+            print("try file")
             contents = await file.read()
-            unpack_cali(contents, maximum_depth_limit=5)
+            all_cali_data.append(contents)
         except Exception as e:
             return {"message": f"There was an error uploading {file.filename}: {e}"}
         finally:
             await file.close()
+
+    await asyncio.to_thread(unpack_cali, all_cali_data, 5)
 
     return {"message": "Successfully uploaded files."}
 
