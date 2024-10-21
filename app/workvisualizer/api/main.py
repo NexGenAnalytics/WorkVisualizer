@@ -41,6 +41,7 @@ from logical_hierarchy import generate_logical_hierarchy_from_root
 import representativeRank
 import timeSlice
 
+import asyncio
 import json
 import mmap
 import os
@@ -167,7 +168,7 @@ def unpack_cali():
             future.result()
 
     aggregate_metadata(files_dir)
-    remove_existing_files(os.path.join(files_dir, "metadata", "procs"))
+    # remove_existing_files(os.path.join(files_dir, "metadata", "procs"))
 
 
 @app.post("/api/clear")
@@ -180,6 +181,7 @@ async def upload_cali_files(files: List[UploadFile] = File(...)):
     cali_dir = os.path.join(files_dir, "cali")
 
     for file in files:
+        print("file")
         try:
             print(file)
             contents = await file.read()
@@ -190,11 +192,13 @@ async def upload_cali_files(files: List[UploadFile] = File(...)):
         finally:
             await file.close()
 
+    await asyncio.to_thread(unpack_cali)
+
     return {"message": "Successfully uploaded files."}
 
 @app.post("/api/unpack")
 def unpack_endpoint():
-    unpack_cali(maximum_depth_limit=5)
+    unpack_cali()
 
 
 # This endpoint doesn't use the rank at all for now
