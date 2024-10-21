@@ -1,3 +1,4 @@
+asyncio
 fastapi
 numpy
 uvicorn

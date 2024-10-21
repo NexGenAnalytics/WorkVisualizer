@@ -112,7 +112,6 @@ def write_out_global_metadata(data, files_dir, depth_string, indent=0):
         json.dump(data, global_metadata_output, indent=indent)
 
 def aggregate_metadata(files_dir):
-    print("CALLING AGGREGATE METADATA")
     proc_metadata_files = read_in_proc_metadata_files(files_dir)
     global_metadata = aggregate_all_proc_metadata(proc_metadata_files)
 
