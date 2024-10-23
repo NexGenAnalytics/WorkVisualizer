@@ -47,7 +47,7 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
                         setUploadProgress(percentage); // Update upload progress
                     },
                 });
-                console.log('File uploaded successfully');
+                console.log('Files uploaded successfully');
                 setIsUploading(false);
                 setIsLoading(false);
                 if (redirectOnSuccess) {

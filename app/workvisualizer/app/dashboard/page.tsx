@@ -153,11 +153,12 @@ export default function Page() {
         setPlots(plots.map(plot => {
             const previousSplits = plot.plot.endpoint.split("/");
             const previousEndpoint = previousSplits.slice(0,-2).join("/");
+            const actualRank = rank == "rep" ? representativeRank : rank;
             return {
                 ...plot,
                 plot: {
                     ...plot.plot,
-                    endpoint: `${previousEndpoint}/${depth}/${rank}`
+                    endpoint: `${previousEndpoint}/${depth}/${actualRank}`
                 }
             };
         }));

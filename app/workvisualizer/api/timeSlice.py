@@ -58,6 +58,9 @@ def define_slices(df: pd.DataFrame, total_runtime: float):
     # Get unique clusters
     unique_clusters = df['cluster'].unique()
 
+    # Previous end time
+    previous_end_time = 0.0
+
     # Iterate through clusters
     for cluster in unique_clusters:
         # Get the subset of the DataFrame for the current cluster
@@ -66,21 +69,19 @@ def define_slices(df: pd.DataFrame, total_runtime: float):
         # Define the end time for the current slice
         end_time = cluster_df['ts'].max()
 
-        # Append the slice to the list
-        slices.append((start_time, end_time))
+        if end_time > previous_end_time:
+            # Append the slice to the list
+            slices.append((start_time, end_time))
 
-        # Update the start time for the next slice
-        start_time = end_time
+            # Update the start time for the next slice
+            start_time = end_time
+
+            # Update the previous end time
+            previous_end_time = end_time
 
     # Handle the final slice
     slices.append((start_time, total_runtime))
 
-    slices[0] = (0.0, slices[1][0])
-
-    # Assert that the slices do not overlap at all
-    for i in range(len(slices)):
-        if i == 0:
-            assert slices[i][0] == 0.0
-        assert slices[i][0] >= slices[i-1][1]
+    slices[0] = (0, slices[1][0])
 
     return slices

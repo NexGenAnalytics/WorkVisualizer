@@ -61,15 +61,13 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
             mostTimeLosingRankSlice = slice_id;
             if (slice.statistics.length > 0) {
                 numRanksWithSignificantTimeLost += slice.statistics.length
-            }
-
-            for (const rankTimeLost of slice.statistics) {
-                const rank = rankTimeLost["rank"];
-                if (rank == mostTimeLosingRank) {
-                    timeLostByMostTimeLosingRank = rankTimeLost["time_lost"];
+                for (const rankTimeLost of slice.statistics) {
+                    const rank = rankTimeLost["rank"];
+                    if (rank == mostTimeLosingRank) {
+                        timeLostByMostTimeLosingRank = rankTimeLost["time_lost"];
+                    }
                 }
             }
-
         }
     }
 

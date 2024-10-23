@@ -45,6 +45,7 @@ export default function AnalysisResultsHelpButton() {
                         </p>
                         <img src="/time_lost_explainer.png" alt="Analysis Visualization" style={{ maxWidth: '100%', height: 'auto' }} />
                         <p>As seen above, if the representative rank is waiting for another rank to enter a collective call, that is time being lost.</p>
+                        <p>Alternatively, if another rank is waiting for the representative rank to enter the collective call, that is reported as <b>negative</b> time lost, and still indicates imbalance in the application.</p>
                     </ModalBody>
                     <ModalFooter>
                         <Button color="danger" variant="light" onPress={onClose}>

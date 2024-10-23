@@ -66,7 +66,7 @@ class LogicalHierarchy:
         found_root = True if self.ftn_id == "" else False
         for event in self.unique_events:
 
-            if int(event["depth"]) + 1 >= self.maximum_depth:
+            if int(event["depth"]) >= self.maximum_depth:
                 continue
 
             if event["ftn_id"] == self.ftn_id:
