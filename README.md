@@ -1,9 +1,17 @@
 
 <img src="app/workvisualizer/public/wv_readme_wordmark.png">
 
-# Work Visualizer
+# WorkVisualizer
 
-The WorkVisualizer is an interactive profiler that runs in the browser.
+The **WorkVisualizer** is an interactive, high-level performance analysis tool from NexGen Analytics.
+
+Jump to:
+- [Contents](#contents)
+- [Generating Data](#generating-data)
+- [App](#app)
+  - [Set-Up](#set-up)
+  - [Opening the App](#opening-the-app)
+  - [Using the App](#using-the-app)
 
 ## Contents
 
