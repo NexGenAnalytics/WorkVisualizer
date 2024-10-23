@@ -74,10 +74,10 @@ export default function Page() {
     const [isAnalysisComplete, setIsAnalysisComplete] = useState(false);
     const [timeSlices, setTimeSlices] = useState(null);
     const [selectedSlice, setSelectedSlice] = useState<string | "">("");
-    const [programStart, setProgramStart] = useState(0.);
-    const [programEnd, setProgramEnd] = useState(1.);
-    const [startTime, setStartTime] = useState(0.);
-    const [endTime, setEndTime] = useState(1.);
+    const [programStart, setProgramStart] = useState(-1);
+    const [programEnd, setProgramEnd] = useState(0);
+    const [startTime, setStartTime] = useState(-1);
+    const [endTime, setEndTime] = useState(0);
     const [specifySlice, setSpecifySlice] = useState(false);
     const [plots, setPlots] = useState<Plot[]>([
         // API formatting: /api/{component}/({root})/{depth}/{rank}
@@ -187,13 +187,16 @@ export default function Page() {
             rank_range_error = `Rank not found in range ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
             known_ranks = tmp_known_ranks.map(String);
 
-            start_time = dataMap['summaryTable']['program.start'];
-            setStartTime(start_time);
-            setProgramStart(start_time);
+            if (startTime == -1) {
+                start_time = dataMap['summaryTable']['program.start'];
+                setStartTime(start_time);
+                setProgramStart(start_time);
+                console.log("Resetting start time");
 
-            end_time = dataMap['summaryTable']['program.end'];
-            setEndTime(end_time);
-            setProgramEnd(end_time);
+                end_time = dataMap['summaryTable']['program.end'];
+                setEndTime(end_time);
+                setProgramEnd(end_time);
+            }
         }
         fetchData();
     }, [plots]);
