@@ -49,11 +49,11 @@ export default function AnalysisTable({ timeSlices, summaryData }) {
 
         // Determine the most time-losing slice
         const timeLostValue = parseFloat(slice.time_lost);
-        if (timeLostValue > maxTimeLost) {
+        if (Math.abs(timeLostValue) > maxTimeLost) {
             totalTimeLost += timeLostValue;
-            maxTimeLost = timeLostValue;
+            maxTimeLost = Math.abs(timeLostValue);
             mostTimeLosingSlice = slice_id;
-            timeLostByMostTimeLosingSlice = maxTimeLost;
+            timeLostByMostTimeLosingSlice = timeLostValue;
         }
 
         if (Number(slice.most_time_losing_rank) >= 0) {

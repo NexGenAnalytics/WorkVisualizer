@@ -441,8 +441,8 @@ def analyze_timeslices():
         time_lost = entry["time_lost"]
         rank = entry["rank"]
         slice_id = entry["slice"]
-        if time_lost > most_time_lost:
-            most_time_lost = time_lost
+        if np.abs(time_lost) > most_time_lost:
+            most_time_lost = np.abs(time_lost)
             most_time_losing_rank = rank
             most_time_losing_rank_slice = slice_id
         if time_lost / program_runtime > threshold_pct:
