@@ -78,6 +78,7 @@ export default function Page() {
     const [programEnd, setProgramEnd] = useState(1.);
     const [startTime, setStartTime] = useState(0.);
     const [endTime, setEndTime] = useState(1.);
+    const [specifySlice, setSpecifySlice] = useState(false);
     const [plots, setPlots] = useState<Plot[]>([
         // API formatting: /api/{component}/({root})/{depth}/{rank}
         //   Defaults:
@@ -397,9 +398,11 @@ export default function Page() {
                                                         if (timeSlices[current_slice]) {
                                                             setStartTime(timeSlices[current_slice].ts[0]);
                                                             setEndTime(timeSlices[current_slice].ts[1]);
+                                                            setSpecifySlice(true);
                                                         } else {
                                                             setStartTime(programStart);
                                                             setEndTime(programEnd);
+                                                            setSpecifySlice(false);
                                                         }
                                                         console.log(startTime);
                                                         console.log(endTime);
@@ -468,6 +471,7 @@ export default function Page() {
                             return PlotComponent ? (
                                 <PlotComponent
                                     data={plotData[key]}
+                                    selectSlice={specifySlice}
                                     start={startTime}
                                     end={endTime}
                                     rank={specifyRank ? inputValue : representativeRank}

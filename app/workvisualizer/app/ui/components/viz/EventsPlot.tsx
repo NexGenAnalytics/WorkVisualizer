@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as d3 from 'd3';
 import {Accordion, AccordionItem} from "@nextui-org/accordion";
 import { CheckboxGroup, Checkbox, Switch, Spacer } from '@nextui-org/react';
@@ -10,14 +10,16 @@ interface EventsPlotProps extends VisualizationProps {
     end: number;
     rank: string;
     timeSlices: any;
+    selectSlice: boolean;
 }
 
-const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, rank, timeSlices }) => {
+const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, rank, timeSlices, selectSlice }) => {
     const ref = useRef();
     const [visibleTypes, setVisibleTypes] = useState(["mpi_collective", "mpi_p2p", "kokkos", "other"]);
     const [filteredData, setFilteredData] = useState(data);
     const [showDuration, setShowDuration] = useState(false);
     const [showSlices, setShowSlices] = useState(false);
+    const [currentZoom, setCurrentZoom] = useState({});
 
     // Determine if time slices are available
     const hasTimeSlices = timeSlices && Object.keys(timeSlices).length > 0;
@@ -44,7 +46,7 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, rank, timeSli
             .range(["#1f77b4", "#f5a524", "#2ca02c", "#a783c9"]);
 
         // Define brush for zooming
-        let brush = d3.brush()
+        const brush = d3.brush()
             .extent([ [0,0], [width, height] ])
             .on("start", disableTooltips)
             .on("end", updateChart);
@@ -54,15 +56,17 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, rank, timeSli
         //     .range([marginLeft, width - marginRight]);
 
         const x = d3.scaleLinear()
-            .domain([start, end])  // Use fixed time values
+            .domain(Object.keys(currentZoom).length > 0 && !selectSlice ? currentZoom.xDomain : [start, end])
             .range([marginLeft, width - marginRight]);
 
         const sortedData = filteredData.sort((a, b) => a.depth - b.depth);
         const uniqueKeys = Array.from(new Set(sortedData.map(d => d.ftn_id)));
         const keyIndexMap = new Map(uniqueKeys.map((key, index) => [key, index]));
 
+        console.log("yDomain: ", currentZoom.yDomain);
+
         const y = d3.scaleLinear()
-            .domain([0, uniqueKeys.length - 1])
+            .domain(Object.keys(currentZoom).length > 0 ? currentZoom.yDomain : d3.extent(data, d => keyIndexMap.get(d.ftn_id)))
             .range([marginTop, height - marginBottom]);
 
         svg.attr("viewBox", [0, 0, width, height])
@@ -282,7 +286,6 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, rank, timeSli
         }
 
         function updateSliceLines() {
-            // Update slice lines
             svg.selectAll(".slice-line")
                 .transition().duration(750)
                 .attr("x1", d => x(d.ts[0]))
@@ -312,6 +315,11 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, rank, timeSli
                 // Clear the brush
                 svg.select(".brush").call(brush.move, null)
             }
+
+            setCurrentZoom({
+                xDomain: x.domain(),
+                yDomain: y.domain()
+            });
 
             // Update axis
             xAxis.transition().duration(750).call(d3.axisBottom(x).ticks(width / 80));
@@ -361,6 +369,11 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, rank, timeSli
                 x.domain(lastZoomState.xDomain);
                 y.domain(lastZoomState.yDomain);
 
+                setCurrentZoom({
+                    xDomain: x.domain(),
+                    yDomain: y.domain()
+                });
+
                 xAxis.transition().duration(750).call(d3.axisBottom(x).ticks(width / 80));
                 yAxis.transition().duration(750).call(d3.axisLeft(y)).call(g => g.select(".domain").remove());
 
@@ -409,10 +422,11 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, rank, timeSli
         }
 
 
-    }, [filteredData, showDuration, rank, showSlices, timeSlices, start, end]);
+    }, [filteredData, showDuration, rank, selectSlice, showSlices, timeSlices, start, end]);
 
     const handleCheckboxChange = (values) => {
         setVisibleTypes(values);
+        setCurrentZoom({});
     };
 
     const handleShowDurationChange = () => {
