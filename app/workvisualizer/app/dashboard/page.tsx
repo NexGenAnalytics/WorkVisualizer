@@ -261,7 +261,6 @@ export default function Page() {
                                         </h3>
                                         <Spacer x={2}/>
                                         <AnalysisResultsHelpButton/>
-                                        <Spacer y={2}/>
                                     </div>
                                 )}
                                 {timeSlices !== null && timeSlices !== undefined ?
@@ -291,7 +290,9 @@ export default function Page() {
                                         <AnalysisHelpButton fromAnalysisTab={false}/>
                                     </div>
                                 }
-                                <Spacer y={5}/>
+                                {timeSlices !== null && timeSlices !== undefined && (
+                                    <Spacer y={2}/>
+                                )}
                                 {timeSlices !== null && timeSlices !== undefined && (
                                     <div style={{ display: 'flex', alignItems: 'center' }}>
                                         <Spacer x={2}/>

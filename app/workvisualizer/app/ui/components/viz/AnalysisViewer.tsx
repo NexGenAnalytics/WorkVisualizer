@@ -4,23 +4,53 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import AnalylsisViewerHelpButton from "@/app/ui/components/help/AnalysisViewerHelpButton";
 
-export default function AnalysisViewer({ data, timeSlices, summaryData }) {
+interface Data {
+    rank: number;
+    slice: number;
+    time_lost: number;
+}
+
+interface TimeSlicesEntry {
+    ts: [number, number];
+    time_lost: string;
+    most_time_losing_rank: number;
+    statistics: Record<string, any>;
+}
+
+interface TimeSlices {
+    [key: string]: TimeSlicesEntry;
+}
+
+interface SummaryData {
+    "program.runtime": number;
+    "mpi.world.size": string;
+}
+
+interface AnalysisViewerProps {
+    data: Data[];
+    timeSlices: TimeSlices;
+    summaryData: SummaryData;
+}
+
+export default function AnalysisViewer(
+    { data, timeSlices, summaryData }
+    : AnalysisViewerProps) {
     const sliceViewer = useRef<SVGSVGElement | null>(null);
     const timeLostViewer = useRef<SVGSVGElement | null>(null);
     const runtimeBar = useRef<SVGSVGElement | null>(null);
     const [selectedSlice, setSelectedSlice] = useState(0);
-    const [startTime, setStartTime] = useState("0");
-    const [endTime, setEndTime] = useState("1");
+    const [startTime, setStartTime] = useState(0.0);
+    const [endTime, setEndTime] = useState(1.0);
     const [maxTimeLostSlice, setMaxTimeLostSlice] = useState<number | null>(null);
     const [showTimeLostPerSlice, setShowTimeLostPerSlice] = useState(false);
     const [maxAvgTimeLost, setMaxAvgTimeLost] = useState(0.0);
 
-    function formatTime(input_time: string) {
-        const time = Number(input_time);
+    function formatTime(time: number, single_sigfig: boolean = false) {
+        const numSigFigs = single_sigfig ? 1 : 2;
         if (Math.abs(time) > 0.01 || time == 0) {
             return time.toFixed(2);
         } else {
-            return time.toExponential(2);
+            return time.toExponential(numSigFigs);
         }
     }
 
@@ -50,13 +80,12 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
             }));
 
             // Find the slice with the maximum time lost
-            const maxTimeLost = d3.max(timeSlicesArray, d => Math.abs(d.time_lost));
-            console.log("maxTimeLost: ", maxTimeLost)
+            const maxTimeLost = d3.max(timeSlicesArray, d => Math.abs(d.time_lost)) || 0.0;
             const sliceWithMaxTimeLost = timeSlicesArray.find(d => Math.abs(d.time_lost) === maxTimeLost);
             setMaxAvgTimeLost(Math.abs(maxTimeLost / numRanks));
 
             if (sliceWithMaxTimeLost) {
-                setMaxTimeLostSlice(sliceWithMaxTimeLost.key); // Set the key of the slice with max time lost
+                setMaxTimeLostSlice(Number(sliceWithMaxTimeLost.key));
             }
         }
     }, [timeSlices, numRanks]); // Only re-run the effect if timeSlices changes
@@ -81,15 +110,13 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
         }
 
         const width = 920;
-        const height = 290;
+        const height = 280;
         const margin = { top: 10, right: 200, bottom: 55, left: 80 };
 
         const xScale = d3.scaleBand()
             .domain(data.map(d => d.id)) // use slice id as the domain
             .range([margin.left, width - margin.right])
             .padding(0.1);
-
-        console.log("maxAvgTimeLost: ", maxAvgTimeLost)
 
         const yScale = d3.scaleLinear()
             .domain([0, Math.abs(maxAvgTimeLost)])
@@ -124,7 +151,11 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
 
         svg.append('g')
             .attr('transform', `translate(${margin.left},0)`)
-            .call(d3.axisLeft(yScale).tickSizeOuter(0))
+            .call(d3.axisLeft(yScale)
+                .tickSizeOuter(0)
+                .ticks(5)
+                .tickFormat(d => formatTime(Number(d), true))
+            )
             .call(g => g.append("text")
                 .attr("x", -height / 2 + 65)
                 .attr("y", margin.left - 130)
@@ -142,19 +173,21 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
             .attr('y', d => yScale(Math.abs(d.time_lost)))
             .attr('width', xScale.bandwidth())
             .attr('height', d => height - margin.bottom - yScale(Math.abs(d.time_lost)))
-            .attr('fill', d => showTimeLostPerSlice && selectedSlice == Number(d.id) ? (d.time_lost > 0.0 ? selectedBarColor : altSelectedBarColor) : (d.time_lost > 0.0 ? barColor : altBarColor))
+            .attr('fill', d => showTimeLostPerSlice && selectedSlice == Number(d.id)
+                          ? (d.time_lost >= 0.0 ? selectedBarColor : altSelectedBarColor)
+                          : (d.time_lost > 0.0 ? barColor : altBarColor))
             // Mouseover event to darken bar and show tooltip
             .on('mouseover', function(event, d) {
                 d3.select(this).attr('fill', showTimeLostPerSlice && selectedSlice == Number(d.id)
-                                             ? (d.time_lost > 0 ? d3.color(selectedBarColor).darker(0.5) : d3.color(altSelectedBarColor).darker(0.5))
-                                             : (d.time_lost > 0 ? d3.color(barColor).darker(0.5) : d3.color(altBarColor).darker(0.5)));
+                                             ? (d.time_lost >= 0 ? d3.color(selectedBarColor).darker(0.5) : d3.color(altSelectedBarColor).darker(0.5))
+                                             : (d.time_lost >= 0 ? d3.color(barColor).darker(0.5) : d3.color(altBarColor).darker(0.5)));
 
                 // Show tooltip
                 tooltip.transition()
                     .duration(200)
                     .style('opacity', .9);
 
-                tooltip.html(`Average Time Lost: ${formatTime(d.time_lost)} s`)
+                tooltip.html(`Average Time Lost: ${formatTime(Number(d.time_lost))} s`)
                     .style('left', (event.pageX + 10) + 'px') // Position tooltip
                     .style('top', (event.pageY - 20) + 'px')
                     .style('color', 'black');
@@ -162,8 +195,8 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
             // Mouseout event to restore original bar color and hide tooltip
             .on('mouseout', function(event, d) {
                 d3.select(this).attr('fill', showTimeLostPerSlice && selectedSlice == Number(d.id)
-                                             ? (d.time_lost > 0.0 ? selectedBarColor : altSelectedBarColor)
-                                             : (d.time_lost > 0.0 ? barColor : altBarColor)); // Reset color
+                                             ? (d.time_lost >= 0.0 ? selectedBarColor : altSelectedBarColor)
+                                             : (d.time_lost >= 0.0 ? barColor : altBarColor)); // Reset color
 
                 tooltip.transition()
                     .duration(500)
@@ -207,15 +240,19 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
             .text('Negative Time Lost')
             .style('fill', 'currentColor');
 
-    }, [timeSlices, totalRuntime, numRanks, barColor, altBarColor, selectedBarColor, altSelectedBarColor, selectedSlice, maxTimeLostSlice]);
+    }, [timeSlices, totalRuntime, numRanks, barColor, altBarColor, selectedBarColor,
+        altSelectedBarColor, selectedSlice, maxTimeLostSlice, formatTime]);
 
     useEffect(() => {
         if (!data) return;
 
-        let topRanks;
+        let topRanks : Data[];
+
         if (showTimeLostPerSlice) {
             const filteredData = data.filter(d => d.slice === selectedSlice);
-            topRanks = allRanks.length > 10 ?  filteredData.sort((a, b) => Math.abs(b.time_lost) - Math.abs(a.time_lost)).slice(0, 10) : filteredData;
+            topRanks = allRanks.length > 10
+                       ? filteredData.sort((a, b) => Math.abs(b.time_lost) - Math.abs(a.time_lost)).slice(0, 10)
+                       : filteredData;
         } else {
             // Aggregate time lost across all slices per rank
             const rankTimeLostMap = new Map();
@@ -225,7 +262,7 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
             });
 
             // Convert the map to an array and sort by time_lost
-            const aggregatedData = Array.from(rankTimeLostMap, ([rank, time_lost]) => ({ rank, time_lost }))
+            const aggregatedData = Array.from(rankTimeLostMap, ([rank, time_lost]) => ({ rank, slice: -1, time_lost }))
                 .sort((a, b) => Math.abs(b.time_lost) - Math.abs(a.time_lost));
 
             // Select the top 10 time-losing ranks
@@ -233,7 +270,7 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
         }
 
         const width = 800;
-        const height = 290;
+        const height = 280;
         const margin = { top: 30, right: 80, bottom: 40, left: 80 };
 
         const xScale = d3.scaleBand()
@@ -291,7 +328,7 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
 
         svg.append('g')
             .attr('transform', `translate(${margin.left},0)`)
-            .call(d3.axisLeft(yScale).tickSizeOuter(0))
+            .call(d3.axisLeft(yScale).tickSizeOuter(0).ticks(5).tickFormat(d => formatTime(Number(d), true)))
             .call(g => g.append("text")
                 .attr("x", -height / 2 + 65)
                 .attr("y", margin.left - 130)
@@ -302,7 +339,7 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
             );
 
         const bars = svg.selectAll('rect')
-            .data(topRanks, d => d.rank);
+            .data(topRanks, d =>d.rank);
 
         // Add new bars and tooltip interactions
         const newBars = bars.enter()
@@ -311,21 +348,21 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
             .attr('y', d => yScale(0))
             .attr('width', xScale.bandwidth())
             .attr('height', 0)
-            .attr('fill', d => d.time_lost > 0.0 ? barColor : altBarColor)
+            .attr('fill', d => d.time_lost >= 0.0 ? barColor : altBarColor)
             .on('mouseover', function(event, d) {
-                d3.select(this).attr('fill', d.time_lost > 0.0 ? d3.color(barColor).darker(0.5) : d3.color(altBarColor)); // Darken the color
+                d3.select(this).attr('fill', d.time_lost >= 0.0 ? d3.color(barColor).darker(0.5) : d3.color(altBarColor)); // Darken the color
 
                 tooltip.transition()
                     .duration(200)
                     .style('opacity', .9);
 
-                tooltip.html(`Time Lost: ${formatTime(d.time_lost)} s`)
+                tooltip.html(`Time Lost: ${formatTime(Number(d.time_lost))} s`)
                     .style('left', (event.pageX + 10) + 'px') // Position tooltip
                     .style('top', (event.pageY - 20) + 'px')
                     .style('color', 'black');
             })
             .on('mouseout', function(event, d) {
-                d3.select(this).attr('fill', d.time_lost > 0.0 ? barColor : altBarColor); // Reset color
+                d3.select(this).attr('fill', d.time_lost >= 0.0 ? barColor : altBarColor); // Reset color
 
                 tooltip.transition()
                     .duration(500)
@@ -345,6 +382,19 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
 
     // Bar representing program runtime
     useEffect(() => {
+
+        const timeLost = Number(timeSlices[selectedSlice].time_lost);
+        const color = timeLost >= 0.0 ? selectedBarColor : altSelectedBarColor;
+
+        const barTooltip = d3.select('body').append('div')
+            .style('position', 'absolute')
+            .style('background-color', 'white')
+            .style('border', '1px solid #d3d3d3')
+            .style('padding', '5px')
+            .style('border-radius', '4px')
+            .style('pointer-events', 'none')
+            .style('opacity', 0);
+
         // Create the runtime bar SVG if it doesn't exist
         const svg = d3.select(runtimeBar.current)
             .attr("width", "100%")
@@ -356,12 +406,12 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
             .attr("x", 0)
             .attr("y", 0)
             .attr("height", 20)
-            .attr("fill", selectedBarColor) // Use the selected bar color
-            .attr("width", 0);  // Initially 0 width
+            .attr("fill", color) // Use the selected bar color
+            .attr("width", 0);
 
         // Scale the selected slice relative to the total runtime
-        const startPercent = Number(startTime) / totalRuntime;
-        const endPercent = Number(endTime) / totalRuntime;
+        const startPercent = startTime / totalRuntime;
+        const endPercent = endTime / totalRuntime;
 
         // Calculate the width and position of the highlighted portion
         const totalWidth = 720;  // Get full bar width
@@ -377,15 +427,40 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
             .transition()
             .duration(500)  // Smooth transition duration
             .attr("x", highlightX)
-            .attr("width", highlightWidth);
+            .attr("width", highlightWidth)
+            .attr("fill", color);
 
-    }, [totalRuntime, startTime, endTime, selectedBarColor]);  // Dependencies to trigger update
+        // Add tooltip to bar
+        svg.select(".highlighted-slice-bar")
+            .on('mouseover', function(event, d) {
+                d3.select(this).attr('fill', d3.color(color).darker(0.5));
+                barTooltip.transition()
+                    .duration(200)
+                    .style('opacity', .9);
+                barTooltip.html(`Average Time Lost on Slice ${selectedSlice}: ${formatTime(Number(timeLost)/numRanks)} s`)
+                    .style('left', (event.pageX + 10) + 'px') // Position barTooltip
+                    .style('top', (event.pageY - 20) + 'px')
+                    .style('color', 'black');
+            })
+            .on('mouseout', function(event, d) {
+                d3.select(this).attr('fill', color); // Reset color
+                barTooltip.transition()
+                    .duration(500)
+                    .style('opacity', 0); // Hide barTooltip
+            })
+            .on('mousemove', function(event) {
+                barTooltip.style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 20) + 'px');
+            });
+
+    }, [totalRuntime, timeSlices, selectedSlice, numRanks,
+        startTime, endTime, selectedBarColor, altSelectedBarColor]);
 
     const handleSliceChange = (value: SliderValue) => {
         const currentSlice = Number(value);
         setSelectedSlice(currentSlice);
-        setStartTime(formatTime(timeSlices[currentSlice]["ts"][0]));
-        setEndTime(formatTime(timeSlices[currentSlice]["ts"][1]));
+        setStartTime(Number(formatTime(Number(timeSlices[currentSlice]["ts"][0]))));
+        setEndTime(Number(formatTime(Number(timeSlices[currentSlice]["ts"][1]))));
     };
 
     return (
@@ -424,7 +499,11 @@ export default function AnalysisViewer({ data, timeSlices, summaryData }) {
                     <svg ref={runtimeBar}></svg>
                 </div>
                 <Spacer y={2}/>
-                <p style={{ marginLeft: '0' }}><b>Slice {selectedSlice} Duration</b>: {formatTime(String(Number(endTime) - Number(startTime)))} s ({formatTime(startTime)} - {formatTime(endTime)})</p>
+                <p style={{ marginLeft: '0' }}>
+                    <b>Slice {selectedSlice} Duration: </b>
+                        {formatTime(endTime - startTime)} s
+                        ({formatTime(startTime)} - {formatTime(endTime)})
+                </p>
                 <Spacer y={1}/>
                 <Slider
                     size="sm"
