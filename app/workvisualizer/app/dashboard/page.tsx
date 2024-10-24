@@ -1,10 +1,17 @@
 'use client'
 import React, {useEffect, useState} from 'react';
 import NavBar from "@/app/ui/components/NavBar";
+import {Textarea} from "@nextui-org/react";
+import {Accordion, AccordionItem} from "@nextui-org/accordion";
 import CallTree from "@/app/ui/components/viz/CallTree";
 import ProportionAnalyzer from "@/app/ui/components/viz/ProportionAnalyzer";
 import EventsPlot from "@/app/ui/components/viz/EventsPlot";
+import AnalysisViewer from "@/app/ui/components/viz/AnalysisViewer";
 import ClusterTable from "@/app/ui/components/viz/ClusterTable";
+import AnalysisTable from "@/app/ui/components/viz/AnalysisTable";
+import AnalysisHelpButton from "@/app/ui/components/help/AnalysisHelpButton";
+import AnalysisResultsHelpButton from "@/app/ui/components/help/AnalysisResultsHelpButton";
+import VizSelectionHelpButton from "@/app/ui/components/help/VizSelectionHelpButton";
 import SummaryTable from "@/app/ui/components/viz/SummaryTable";
 import {
     Button,
@@ -54,46 +61,39 @@ let end_time : number;
 export default function Page() {
     const [selectedPlot, setSelectedPlot] = useState<string[]>([]);
     const [selectedRank, setSelectedRank] = useState<string | "0">("0");
-    const [inputValue, setInputValue] = useState("");
+    const [inputValue, setInputValue] = useState("0");
     const [invalidRank, setInvalidRank] = useState(false);
     const [specifyRank, setSpecifyRank] = useState<boolean | true>(true);
     const [changedInput, setChangedInput] = useState(false);
     const [selectedDepth, setSelectedDepth] = useState<number | 5>(5);
     const [isIndentedTreeSelected, setIsIndentedTreeSelected] = useState(false);
     const [plotData, setPlotData] = useState<any>({});
+    const [representativeRank, setRepresentativeRank] = useState<string | null>(null);
+    const [rankClusters, setRankClusters] = useState(null);
+    const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
+    const [isAnalysisComplete, setIsAnalysisComplete] = useState(false);
+    const [timeSlices, setTimeSlices] = useState(null);
+    const [selectedSlice, setSelectedSlice] = useState<string | "">("");
+    const [programStart, setProgramStart] = useState(-1);
+    const [programEnd, setProgramEnd] = useState(0);
+    const [startTime, setStartTime] = useState(-1);
+    const [endTime, setEndTime] = useState(0);
+    const [specifySlice, setSpecifySlice] = useState(false);
     const [plots, setPlots] = useState<Plot[]>([
         // API formatting: /api/{component}/({root})/{depth}/{rank}
         //   Defaults:
         //      root (only for hierarchies): -1 (shows entire available tree)
-        //      depth:                        5 (only parses records with path depth < 5)
+        //      depth:                        5 (show records with path depth < 5)
         //      rank:                         0 (default to rank 0)
         { key: 'callTree', plot: { label: 'Call Tree', endpoint: '/api/logical_hierarchy/-1/5/0' } },
         { key: 'proportionAnalyzer', plot: { label: 'Proportion Analyzer', endpoint: '/api/logical_hierarchy/-1/5/0'} },
         { key: 'eventsPlot', plot: { label: 'Events Plot', endpoint: '/api/eventsplot/5/0'} },
         { key: 'summaryTable', plot: { label: 'Summary Table', endpoint: '/api/metadata/5/0' } },
+        { key: 'analysisViewer', plot: { label: 'Analysis Viewer', endpoint: '/api/analysisviewer/5/0'}}
         ]);
-    const [isAnalysisRunning, setIsAnalysisRunning] = useState(false);
-    const [representativeRank, setRepresentativeRank] = useState(null);
-    const [rankClusters, setRankClusters] = useState(null);
-    const [isTimeSlicingRunning, setIsTimeSlicingRunning] = useState(false);
-    const [timeSlices, setTimeSlices] = useState(null);
-    const [selectedSlice, setSelectedSlice] = useState<string | null>(null);
-    const [showSliceLines, setShowSliceLines] = useState(false);
 
-
-    const handleAnalysisButtonClick = async () => {
+    const handleRunAnalysisButtonClick = async () => {
         setIsAnalysisRunning(true);
-        const response = await fetch('/api/analysis/representativerank');
-        const data = await response.json();
-        setRepresentativeRank(data["representative rank"]);
-        const cluster_response = await fetch('/api/analysis/rankclusters');
-        const cluster_data = await cluster_response.json();
-        setRankClusters(cluster_data);
-        setIsAnalysisRunning(false);
-    };
-
-    const handleTimeSlicingButtonClick = async () => {
-        setIsTimeSlicingRunning(true);
         const repr_response = await fetch('/api/analysis/representativerank');
         const repr_data = await repr_response.json();
         setRepresentativeRank(repr_data["representative rank"]);
@@ -103,7 +103,8 @@ export default function Page() {
         const slice_response = await fetch('/api/analysis/timeslices');
         const slice_data = await slice_response.json();
         setTimeSlices(slice_data);
-        setIsTimeSlicingRunning(false);
+        setIsAnalysisComplete(true);
+        setIsAnalysisRunning(false);
     };
 
     const handleRadioChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,11 +154,12 @@ export default function Page() {
         setPlots(plots.map(plot => {
             const previousSplits = plot.plot.endpoint.split("/");
             const previousEndpoint = previousSplits.slice(0,-2).join("/");
+            const actualRank = rank == "rep" ? representativeRank : rank;
             return {
                 ...plot,
                 plot: {
                     ...plot.plot,
-                    endpoint: `${previousEndpoint}/${depth}/${rank}`
+                    endpoint: `${previousEndpoint}/${depth}/${actualRank}`
                 }
             };
         }));
@@ -185,11 +187,33 @@ export default function Page() {
             rank_range_error = `Rank not found in range ${known_ranks[0]} - ${known_ranks[known_ranks.length - 1]}`;
             known_ranks = tmp_known_ranks.map(String);
 
-            start_time = dataMap['summaryTable']['program.start'];
-            end_time = dataMap['summaryTable']['program.end'];
+            if (startTime == -1) {
+                start_time = dataMap['summaryTable']['program.start'];
+                setStartTime(start_time);
+                setProgramStart(start_time);
+                console.log("Resetting start time");
+
+                end_time = dataMap['summaryTable']['program.end'];
+                setEndTime(end_time);
+                setProgramEnd(end_time);
+            }
         }
         fetchData();
     }, [plots]);
+
+        useEffect(() => {
+            if (isAnalysisComplete) {
+                const fetchAnalysisViewerData = async () => {
+                    const response = await fetch(`/api/analysisviewer/5/${specifyRank ? inputValue : representativeRank}`);
+                    const data = await response.json();
+                    setPlotData((prevData) => ({
+                        ...prevData,
+                        analysisViewer: data,
+                    }));
+                };
+                fetchAnalysisViewerData();
+            }
+        }, [isAnalysisComplete, inputValue, representativeRank]);
 
     return (
         <div className='h-screen '>
@@ -203,17 +227,21 @@ export default function Page() {
                     >
                         Call Tree
                     </Checkbox>
-                    <Select
-                        label="Select Plots"
-                        variant="bordered"
-                        placeholder="Select plots"
-                        onSelectionChange={(keys) => setSelectedPlot(Array.from(keys))}
-                        className="min-w-full pt-4"
-                    >
-                        {plots.filter(plot => plot.key !== 'callTree' && plot.key !== 'summaryTable').map((plot) => (
-                            <SelectItem key={plot.key}>{plot.plot.label}</SelectItem>
-                        ))}
-                    </Select>
+                    <Spacer y={5}/>
+                    <div className="flex items-center space-x-4">
+                        <Select
+                            variant="bordered"
+                            placeholder="Select visualization"
+                            onSelectionChange={(keys) => setSelectedPlot(Array.from(keys))}
+                            className="min-w-[200px]"
+                            disabledKeys={timeSlices ? [] : ["analysisViewer"]}
+                        >
+                            {plots.filter(plot => plot.key !== 'callTree' && plot.key !== 'summaryTable').map((plot) => (
+                                <SelectItem key={plot.key}>{plot.plot.label}</SelectItem>
+                            ))}
+                        </Select>
+                        <VizSelectionHelpButton/>
+                    </div>
                     <Spacer y={5}/>
                     <Divider orientation='horizontal'/>
                     <Spacer y={2}/>
@@ -224,113 +252,55 @@ export default function Page() {
                             </Card>
                         </Tab>
                         <Tab key="analysis" title="Analysis">
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <Spacer y={2}/>
-                                {/* {representativeRank !== null && representativeRank !== undefined ?
-                                        <Card>
-                                          <CardBody>
-                                            <p>Representative rank: {representativeRank}</p>
-                                          </CardBody>
-                                        </Card>
-                                    :
-                                    <Button
-                                        color="default"
-                                        onPress={handleAnalysisButtonClick}
-                                        onKeyDown={handleAnalysisButtonClick}
-                                        isDisabled={isAnalysisRunning}>
-                                        {isAnalysisRunning ?
-                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                <CircularProgress size="sm" aria-label="Loading..."/>
-                                                <span style={{ marginLeft: '10px' }}>Running...</span>
-                                            </div>
-                                            : 'Run rank analysis'}
-                                    </Button>
-                                } */}
-                                <Spacer x={2}/>
+                            <Card>
+                                {timeSlices !== null && timeSlices !== undefined && (
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                        <Spacer x={3} y={2}/>
+                                        <h3 style={{ fontSize: '1.0rem', margin: '1rem 0', fontWeight: 'bold' }}>
+                                            Analysis Results
+                                        </h3>
+                                        <Spacer x={2}/>
+                                        <AnalysisResultsHelpButton/>
+                                    </div>
+                                )}
                                 {timeSlices !== null && timeSlices !== undefined ?
-                                    <Card>
-                                        <CardBody>
-                                            <p>Time Slices Generated ✅</p>
-                                            <Checkbox
-                                                isSelected={showSliceLines}
-                                                onChange={(e) => setShowSliceLines(e.target.checked)}
-                                            >
-                                                Show Slice Lines
-                                            </Checkbox>
-                                        </CardBody>
-                                    </Card>
-                                    :
-                                    <Button
-                                        color="default"
-                                        onPress={handleTimeSlicingButtonClick}
-                                        onKeyDown={handleTimeSlicingButtonClick}
-                                        isDisabled={isTimeSlicingRunning}>
-                                        {isTimeSlicingRunning ?
-                                            <div style={{ display: 'flex', alignItems: 'center' }}>
-                                                <CircularProgress size="sm" aria-label="Loading..."/>
-                                                <span style={{ marginLeft: '10px' }}>Running...</span>
-                                            </div>
-                                            : 'Run time slicing analysis'}
-                                    </Button>
-                                }
-                            </div>
-                            <Spacer y={2}/>
-                            {timeSlices !== null && timeSlices !== undefined ?
-                                <>
-                                    <Input
-                                        label="Enter slice name"
-                                        type="number"
-                                        placeholder="Enter slice name"
-                                        value={selectedSlice || ""}
-                                        onChange={(e) => setSelectedSlice(e.target.value)}
+                                    <AnalysisTable
+                                        timeSlices={timeSlices}
+                                        summaryData={plotData['summaryTable']}
+                                        analysisData={plotData['analysisViewer']}
                                     />
+                                    :
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                        <Spacer x={2}/>
+                                        <Button
+                                            color="primary"
+                                            onPress={handleRunAnalysisButtonClick}
+                                            onKeyDown={handleRunAnalysisButtonClick}
+                                            isDisabled={isAnalysisRunning}
+                                            style={{ display: 'block', marginTop: '10px' }}
+                                        >
+                                            {isAnalysisRunning ? (
+                                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                    <CircularProgress size="sm" aria-label="Loading..." />
+                                                    <span style={{ marginLeft: '10px' }}>Running...</span>
+                                                </div>
+                                            ) : ('Run Analysis')}
+                                        </Button>
+                                        <Spacer x={2}/>
+                                        <AnalysisHelpButton fromAnalysisTab={false}/>
+                                    </div>
+                                }
+                                {timeSlices !== null && timeSlices !== undefined && (
                                     <Spacer y={2}/>
-                                    <Table aria-label="Time Slices Table">
-                                        <TableHeader>
-                                            <TableColumn>Slice Name</TableColumn>
-                                            <TableColumn>Begin</TableColumn>
-                                            <TableColumn>End</TableColumn>
-                                            <TableColumn>Avg Time Lost (s)</TableColumn>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {Object.entries(timeSlices).map(([sliceName, sliceData]) => (
-                                                sliceName === selectedSlice ?
-                                                    <TableRow key={sliceName}>
-                                                        <TableCell>{sliceName}</TableCell>
-                                                        <TableCell>
-                                                            {
-                                                                `${sliceData.ts[0].toFixed(3)}`
-                                                            }
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {
-                                                                `${sliceData.ts[1].toFixed(3)}`
-                                                            }
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Dropdown>
-                                                                <DropdownTrigger>
-                                                                    <Button>{sliceData.time_lost}</Button>
-                                                                </DropdownTrigger>
-                                                                <DropdownMenu>
-                                                                    {Object.entries(sliceData.statistics).map(([statKey, statValue]) => (
-                                                                        <DropdownItem key={statKey}>{`${statKey}: ${statValue}`}</DropdownItem>
-                                                                    ))}
-                                                                </DropdownMenu>
-                                                            </Dropdown>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                    : null
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </>
-                                : null
-                            }
-                            {/* {rankClusters !== null && rankClusters !== undefined ?
-                                <ClusterTable clusters={rankClusters} />
-                            : null
-                            } */}
+                                )}
+                                {timeSlices !== null && timeSlices !== undefined && (
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                        <Spacer x={2}/>
+                                        <p style={{ fontSize: '15px' }}><i>Tip: Visualize these results with the Analysis Viewer in the visualizations dropdown.</i></p>
+                                    </div>
+                                )}
+                                <Spacer y={2}/>
+                            </Card>
                         </Tab>
                         <Tab key="setting" title="Settings">
                             <Card>
@@ -404,6 +374,83 @@ export default function Page() {
                                     ))}
                                 </Select>
                                 <Spacer y={5}/>
+                                <Accordion isDisabled={!timeSlices} defaultExpandedKeys={timeSlices ? ["1"] : [""]}>
+                                    <AccordionItem
+                                        title={
+                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                <Spacer x={1}/>
+                                                Slice Explorer
+                                            </div>
+                                        }
+                                        key="1"
+                                    >
+                                        {timeSlices && (
+                                            <>
+                                                <Input
+                                                    label={selectedSlice in Object.keys(timeSlices) || selectedSlice == ""
+                                                            ? "Enter slice name"
+                                                            : `Enter slice from 0 - ${Object.keys(timeSlices).length - 1}`}
+                                                    type="number"
+                                                    placeholder={`Enter slice from 0 - ${Object.keys(timeSlices).length - 1}`}
+                                                    value={selectedSlice || ""}
+                                                    color={selectedSlice in Object.keys(timeSlices) || selectedSlice == ""
+                                                            ? "default"
+                                                            : "danger"}
+                                                    onChange={(e) => {
+                                                        const current_slice = e.target.value
+                                                        setSelectedSlice(current_slice);
+                                                        if (timeSlices[current_slice]) {
+                                                            setStartTime(timeSlices[current_slice].ts[0]);
+                                                            setEndTime(timeSlices[current_slice].ts[1]);
+                                                            setSpecifySlice(true);
+                                                        } else {
+                                                            setStartTime(programStart);
+                                                            setEndTime(programEnd);
+                                                            setSpecifySlice(false);
+                                                        }
+                                                        console.log(startTime);
+                                                        console.log(endTime);
+                                                    }}
+                                                />
+                                                <Spacer y={2}/>
+                                                <Table aria-label="Time Slices Table">
+                                                    <TableHeader>
+                                                        <TableColumn>Slice Name</TableColumn>
+                                                        <TableColumn>Begin (s)</TableColumn>
+                                                        <TableColumn>End (s)</TableColumn>
+                                                        <TableColumn>Total Time Lost (s)</TableColumn>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                        {Object.entries(timeSlices).map(([sliceName, sliceData]) => (
+                                                            sliceName === selectedSlice ?
+                                                                <TableRow key={sliceName}>
+                                                                    <TableCell>{sliceName}</TableCell>
+                                                                    <TableCell>
+                                                                        {
+                                                                            `${sliceData.ts[0].toFixed(3)}`
+                                                                        }
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        {
+                                                                            `${sliceData.ts[1].toFixed(3)}`
+                                                                        }
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                            {
+                                                                                Math.abs(Number(sliceData.time_lost)) >= 0.01 ?
+                                                                                    `${Number(sliceData.time_lost).toFixed(2)}` :
+                                                                                    `${Number(sliceData.time_lost).toExponential(2)}`
+                                                                            }
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                                : null
+                                                        ))}
+                                                    </TableBody>
+                                                </Table>
+                                            </>
+                                        )}
+                                    </AccordionItem>
+                                </Accordion>
                             </Card>
                         </Tab>
                     </Tabs>
@@ -418,14 +465,30 @@ export default function Page() {
                     {isIndentedTreeSelected && plotData['callTree'] ? <Divider orientation='vertical' /> : null}
                     <Spacer x={2}/>
                     <div className="overflow-auto">
-                        <Spacer y={5}/>
-                        {selectedPlot.map((key) => {
+                    {selectedPlot.length > 0 ? (
+                        selectedPlot.map((key) => {
                             const PlotComponent = {
                                 'proportionAnalyzer': ProportionAnalyzer,
                                 'eventsPlot': EventsPlot,
+                                'analysisViewer': timeSlices ? AnalysisViewer : null,
                             }[key];
-                            return PlotComponent ? <PlotComponent data={plotData[key]} start={start_time} end={end_time} timeSlices={timeSlices} showSliceLines={showSliceLines} /> : null;
-                        })}
+                            return PlotComponent ? (
+                                <PlotComponent
+                                    data={plotData[key]}
+                                    selectSlice={specifySlice}
+                                    start={startTime}
+                                    end={endTime}
+                                    rank={specifyRank ? inputValue : representativeRank}
+                                    timeSlices={timeSlices}
+                                    summaryData={plotData['summaryTable']}
+                                />
+                            ) : null;
+                        })
+                    ) : (
+                        <div>
+                            <p><i>Select a visualization from the dropdown menu.</i></p>
+                        </div>
+                    )}
                     </div>
                 </div>
             </div>

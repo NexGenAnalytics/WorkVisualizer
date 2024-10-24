@@ -1,29 +1,45 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import * as d3 from 'd3';
+import {Accordion, AccordionItem} from "@nextui-org/accordion";
 import { CheckboxGroup, Checkbox, Switch, Spacer } from '@nextui-org/react';
 import { VisualizationProps } from '@/app/types';
+import EventsPlotHelpButton from '@/app/ui/components/help/EventsPlotHelpButton';
 
 interface EventsPlotProps extends VisualizationProps {
     start: number;
     end: number;
+    rank: string;
     timeSlices: any;
-    showSliceLines: boolean;
+    selectSlice: boolean;
 }
 
-const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, showSliceLines }) => {
-    const ref = useRef();
+const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, rank, timeSlices, selectSlice }) => {
+    const eventsPlot = useRef();
     const [visibleTypes, setVisibleTypes] = useState(["mpi_collective", "mpi_p2p", "kokkos", "other"]);
     const [filteredData, setFilteredData] = useState(data);
     const [showDuration, setShowDuration] = useState(false);
+    const [showSlices, setShowSlices] = useState(false);
+    const [currentXDomain, setCurrentXDomain] = useState<number[]>([]);
+    const [currentYDomain, setCurrentYDomain] = useState<number[]>([]);
+    const [toggledDuration, setToggledDuration] = useState(false);
+    const [zoomStack, setZoomStack] = useState([]);
+
+    // Determine if time slices are available
+    const hasTimeSlices = timeSlices && Object.keys(timeSlices).length > 0;
 
     // Update filteredData when visibleTypes change
     useEffect(() => {
         const filtered = data.filter(d => visibleTypes.includes(d.type));
         setFilteredData(filtered);
-    }, [data, visibleTypes]);
+        setCurrentYDomain([]);
+        if (!toggledDuration) {
+            setCurrentXDomain([start, end]);
+        }
+        setToggledDuration(false);
+    }, [data, start, end, visibleTypes]);
 
     useEffect(() => {
-        const svg = d3.select(ref.current);
+        const svg = d3.select(eventsPlot.current);
         svg.selectAll("*").remove();
 
         const width = 928;
@@ -38,25 +54,31 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, s
             .range(["#1f77b4", "#f5a524", "#2ca02c", "#a783c9"]);
 
         // Define brush for zooming
-        let brush = d3.brush()
+        const brush = d3.brush()
             .extent([ [0,0], [width, height] ])
             .on("start", disableTooltips)
             .on("end", updateChart);
 
-        // const x = d3.scaleLinear()
-        //     .domain(d3.extent(filteredData, d => d.ts))
-        //     .range([marginLeft, width - marginRight]);
+        console.log("toggled duration? ", toggledDuration);
 
         const x = d3.scaleLinear()
-            .domain([start, end])  // Use fixed time values
+            .domain(currentXDomain.length == 0 || (selectSlice && !toggledDuration) ? [start, end] : currentXDomain)
             .range([marginLeft, width - marginRight]);
+
+        setToggledDuration(false);
+
+        console.log("currentXDomain: ", currentXDomain);
+        console.log("Actual x domain: ", x.domain())
+        console.log("start time: ", start);
+        console.log("end time: ", end);
+        console.log("select slice?: ", selectSlice);
 
         const sortedData = filteredData.sort((a, b) => a.depth - b.depth);
         const uniqueKeys = Array.from(new Set(sortedData.map(d => d.ftn_id)));
         const keyIndexMap = new Map(uniqueKeys.map((key, index) => [key, index]));
 
         const y = d3.scaleLinear()
-            .domain([0, uniqueKeys.length - 1])
+            .domain(currentYDomain.length == 0 ? d3.extent(data, d => keyIndexMap.get(d.ftn_id)) : currentYDomain)
             .range([marginTop, height - marginBottom]);
 
         svg.attr("viewBox", [0, 0, width, height])
@@ -256,10 +278,7 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, s
         let idleTimeout;
         function idled() { idleTimeout = null; }
 
-        // Stack to keep track of zoom states
-        let zoomStack = [];
-
-        if (showSliceLines && timeSlices) {
+        if (showSlices && hasTimeSlices) {
             svg.append("g")
                 .selectAll("line")
                 .data(Object.values(timeSlices))
@@ -271,12 +290,9 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, s
                 .attr("y2", height - marginBottom)
                 .attr("stroke", "red")
                 .attr("stroke-width", 2);
-
-
         }
 
         function updateSliceLines() {
-            // Update slice lines
             svg.selectAll(".slice-line")
                 .transition().duration(750)
                 .attr("x1", d => x(d.ts[0]))
@@ -297,7 +313,10 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, s
                     xDomain: x.domain(),
                     yDomain: y.domain()
                 };
-                zoomStack.push(zoomState);
+
+                let current_zoom_stack = zoomStack;
+                current_zoom_stack.push(zoomState);
+                setZoomStack(current_zoom_stack);
 
                 // Update x and y domains based on brush selection
                 x.domain([x.invert(selection[0][0]), x.invert(selection[1][0])]);
@@ -306,6 +325,9 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, s
                 // Clear the brush
                 svg.select(".brush").call(brush.move, null)
             }
+
+            setCurrentXDomain(x.domain());
+            setCurrentYDomain(y.domain());
 
             // Update axis
             xAxis.transition().duration(750).call(d3.axisBottom(x).ticks(width / 80));
@@ -351,9 +373,15 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, s
         svg.on("dblclick", () => {
             disableTooltips;
             if (zoomStack.length > 0) {
-                const lastZoomState = zoomStack.pop();
+                let current_zoom_stack = zoomStack;
+                const lastZoomState = current_zoom_stack.pop();
+                setZoomStack(current_zoom_stack);
+
                 x.domain(lastZoomState.xDomain);
                 y.domain(lastZoomState.yDomain);
+
+                setCurrentXDomain(x.domain());
+                setCurrentYDomain(y.domain());
 
                 xAxis.transition().duration(750).call(d3.axisBottom(x).ticks(width / 80));
                 yAxis.transition().duration(750).call(d3.axisLeft(y)).call(g => g.select(".domain").remove());
@@ -403,18 +431,28 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, s
         }
 
 
-    }, [filteredData, showDuration, showSliceLines, timeSlices]);
+    }, [filteredData, showDuration, rank, selectSlice, showSlices, timeSlices, start, end]);
 
     const handleCheckboxChange = (values) => {
         setVisibleTypes(values);
     };
 
-    const handleToggleChange = () => {
+    const handleShowDurationChange = () => {
         setShowDuration(prevState => !prevState);
+        setToggledDuration(true);
+    };
+
+    const handleShowSlicesChange = () => {
+        setShowSlices(prevState => !prevState);
     };
 
     return (
         <div>
+            <div style={{ display: "flex", alignItems: "center" }}>
+                <h2 style={{ fontSize: '1.5rem', margin: '1rem 0', fontWeight: 'bold' }}>Events Plot</h2>
+                <Spacer x={2}/>
+                <EventsPlotHelpButton/>
+            </div>
             <CheckboxGroup
                 size="sm"
                 orientation="horizontal"
@@ -430,13 +468,30 @@ const EventsPlot: React.FC<EventsPlotProps> = ({ data, start, end, timeSlices, s
             <Spacer y={5} />
             <Switch
                 checked={showDuration}
-                onChange={handleToggleChange}
+                onChange={handleShowDurationChange}
                 size="sm"
                 color="primary"
             >
-                Show Duration
+                Show Duration (Must deselect to zoom)
             </Switch>
-            <svg ref={ref} width={928} height={600} />
+            <Spacer y={1}/>
+            <div style={{ display: "flex", alignItems: "center" }}>
+                <Switch
+                    checked={showSlices}
+                    isDisabled={!hasTimeSlices}
+                    onChange={handleShowSlicesChange}
+                    size="sm"
+                    color="primary"
+                >
+                    {hasTimeSlices
+                        ? "Show Time Slices"
+                        : "Show Time Slices (Requires Analysis)"
+                    }
+                </Switch>
+            </div>
+            <Spacer y={5}/>
+            <svg ref={eventsPlot} width={928} height={600} />
+            <p><i>Rank {rank}</i></p>
         </div>
     );
 };
