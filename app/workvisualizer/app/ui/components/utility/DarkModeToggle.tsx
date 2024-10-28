@@ -22,7 +22,6 @@ const DarkModeToggle = () => {
 
     return (
       <div>
-        {/*The current theme is: {theme}*/}
         <Switch
             defaultSelected={theme === 'dark'}
             onValueChange={handleThemeChange}

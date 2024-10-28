@@ -3,7 +3,7 @@
 import { Button } from '@nextui-org/react';
 import { Progress } from "@nextui-org/progress";
 import axios from 'axios';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CircularProgress } from '@nextui-org/react';
 
@@ -25,10 +25,14 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         setIsLoading(true);
         const files = event.target.files;
+        const totalFiles = files ? files.length : 0;
+        let filesUploaded = 0;
 
-        if (files && files.length > 0) {
+        if (files && totalFiles > 0) {
+            setIsUploading(true);
             try {
                 await axios.post('http://127.0.0.1:8000/api/clear');
+
                 // Create an array of promises for parallel upload
                 const uploadPromises = Array.from(files).map((file) => {
                     const formData = new FormData();
@@ -39,17 +43,28 @@ const FileUploadButton: React.FC<FileUploadButtonProps> = ({ redirectOnSuccess }
                         headers: {
                             'Content-Type': 'multipart/form-data',
                         },
+                        onUploadProgress: (progressEvent) => {
+                            const { loaded, total } = progressEvent;
+                            const fileProgress = Math.round((loaded / total!) * 100);
+                            const overallProgress = Math.round(((filesUploaded + fileProgress / 100) / totalFiles) * 100);
+                            setUploadProgress(overallProgress);
+                        },
+                    }).then(() => {
+                        filesUploaded += 1;
                     });
                 });
 
                 // Wait for all uploads to complete
                 await Promise.all(uploadPromises);
-
+                setUploadProgress(100);
                 console.log('All files uploaded successfully');
+
+                await axios.post('http://127.0.0.1:8000/api/unpack')
 
                 if (redirectOnSuccess) {
                     router.push(redirectOnSuccess);
                 }
+
             } catch (error) {
                 console.error('Error uploading files', error);
                 setIsUploading(false);

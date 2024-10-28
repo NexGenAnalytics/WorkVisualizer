@@ -1,4 +1,4 @@
-asyncio
+aiofiles
 fastapi
 numpy
 uvicorn

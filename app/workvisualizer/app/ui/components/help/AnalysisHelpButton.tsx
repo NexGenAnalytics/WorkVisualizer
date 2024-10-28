@@ -1,5 +1,6 @@
 import React from 'react';
 import {Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, useDisclosure} from "@nextui-org/react";
+import HelpIconButton from '@/app/ui/components/help/HelpButton';
 
 // Rename the interface to avoid name conflict
 interface AnalysisHelpButtonProps {
@@ -11,25 +12,7 @@ export default function AnalysisHelpButton({ fromAnalysisTab }: AnalysisHelpButt
 
     return (
         <div>
-            <div onClick={onOpen} style={{
-                width: '25px',
-                height: '25px',
-                borderRadius: '50%',
-                backgroundColor: '#495057',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: 'white',
-                fontSize: '15px',
-                border: 'none',
-                transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#343a40'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#495057'; }}
-            >
-                ?
-            </div>
+            <HelpIconButton onClick={onOpen} />
             <Modal backdrop={"blur"} isOpen={isOpen} onOpenChange={onOpenChange}>
                 <ModalContent>
                 {(onClose) => (
