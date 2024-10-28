@@ -26,16 +26,24 @@ Output:
 
 def split_events_into_slices(events, slices):
     """Split the events data into the slices."""
-    # slice_ids = list(slices.keys())
     slice_ids = list(range(len(slices)))
     rank_slices = {slice_id: [] for slice_id in slice_ids}
     slice_id_iterator = 0
+
     for event in events:
-        current_slice_id = slice_ids[slice_id_iterator]
-        current_slice = slices[current_slice_id]
-        if event["ts"] > current_slice[1]:
-            slice_id_iterator += 1
-        rank_slices[current_slice_id].append(event)
+        while slice_id_iterator < len(slice_ids):
+            current_slice_id = slice_ids[slice_id_iterator]
+            current_slice = slices[current_slice_id]
+
+            if event["ts"] <= current_slice[1]:
+                rank_slices[current_slice_id].append(event)
+                break
+            else:
+                slice_id_iterator += 1
+
+            if slice_id_iterator >= len(slice_ids):
+                break
+
     return rank_slices
 
 def calculate_slice_stats(rank_slices):
