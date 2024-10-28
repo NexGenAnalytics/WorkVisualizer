@@ -1,14 +1,16 @@
 'use client'
 import { useEffect, useRef, useState } from 'react';
+import {Accordion, AccordionItem} from "@nextui-org/accordion";
 import * as d3 from 'd3';
 import { CheckboxGroup, Checkbox, Spacer, Switch } from '@nextui-org/react';
+import ProportionAnalyzerHelpButton from '@/app/ui/components/help/ProportionAnalyzerHelpButton';
 
 export const dataRequirements = {
     endpoint: '/api/logical_hierarchy/-1', // API endpoint for this component's data
     params: {}                             // Additional parameters if needed
 };
 
-const GlobalSunBurst = ({ data }) => {
+const GlobalSunBurst = ({ data, rank }) => {
     const ref = useRef();
     const [visibleTypes, setVisibleTypes] = useState(["mpi_collective", "mpi_p2p", "kokkos", "other"]);
     const [showImbalance, setShowImbalance] = useState(false);
@@ -146,7 +148,7 @@ const GlobalSunBurst = ({ data }) => {
             return d.y1 <= 3 && d.y0 >= 1 && d.x1 > d.x0;
         }
 
-    }, [data, visibleTypes, showImbalance]);
+    }, [data, rank, visibleTypes, showImbalance]);
 
     const handleCheckboxChange = (values) => {
         setVisibleTypes(values);
@@ -158,6 +160,13 @@ const GlobalSunBurst = ({ data }) => {
 
     return (
         <div>
+            <div style={{ display: "flex", alignItems: "center" }}>
+                <h2 style={{ fontSize: "1.5rem", margin: "1rem 0", fontWeights: "bold"}}>
+                    Proportion Analyzer
+                </h2>
+                <Spacer x={2}/>
+                <ProportionAnalyzerHelpButton/>
+            </div>
             <CheckboxGroup
                 size="sm"
                 orientation="horizontal"
@@ -170,16 +179,9 @@ const GlobalSunBurst = ({ data }) => {
                 <Checkbox color="success" value="kokkos">Kokkos</Checkbox>
                 <Checkbox color="secondary" value="other">Application</Checkbox>
             </CheckboxGroup>
-            <Spacer y={5} />
-            {/* <Switch
-                checked={showImbalance}
-                onChange={handleImbalanceToggle}
-                size="sm"
-                color="danger"
-            >
-                Highlight Imbalance
-            </Switch> */}
+            <Spacer y={5}/>
             <svg ref={ref} width={700} height={700} />
+            <p><i>Rank {rank}</i></p>
         </div>
     );
 };
