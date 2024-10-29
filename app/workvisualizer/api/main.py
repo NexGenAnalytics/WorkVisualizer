@@ -35,14 +35,13 @@
 from logging_utils.logging_utils import log_timed, set_log_level
 from cali2events import convert_cali_to_json
 from sliceAnalysis import run_slice_analysis
-from events2hierarchy import events_to_hierarchy
 from aggregateMetadata import aggregate_metadata
 from logical_hierarchy import generate_logical_hierarchy_from_root
 import representativeRank
 import timeSlice
 
 import json
-import mmap
+import aiofiles
 import os
 import sys
 import re
@@ -54,6 +53,11 @@ import orjson
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
+
+####################################
+###       Global Variables       ###
+####################################
 
 
 app = FastAPI()
@@ -69,6 +73,11 @@ app.add_middleware(
 files_dir = os.path.join(os.getcwd(), "files")
 
 
+####################################
+###       Helper Functions       ###
+####################################
+
+
 @log_timed()
 def remove_existing_files(directory):
     if os.path.isdir(directory):
@@ -78,7 +87,6 @@ def remove_existing_files(directory):
                 os.remove(full_path)
             elif os.path.isdir(full_path):
                 remove_existing_files(full_path)
-
 
 @log_timed()
 def create_files_directory(files_directory):
@@ -100,20 +108,14 @@ def create_files_directory(files_directory):
     metadata_proc_dir = os.path.join(metadata_dir, "procs")
     os.makedirs(metadata_proc_dir, exist_ok=True)
 
+@app.post("/api/clear")
+async def clear_files_dir():
+    remove_existing_files(files_dir)
+    create_files_directory(files_dir)
 
-# Endpoint to change the log level dynamically
-@app.get("/set-log-level/{log_level}")
-def set_log_level_endpoint(log_level: str):
-    try:
-        message = set_log_level(log_level)
-        return {"message": message}
-    except ValueError as e:
-        return {"error": str(e)}
-
-
-# Simple helper function
 @log_timed()
 def get_data_from_json(filepath, depth=-1):
+    """Read in the given JSON and return the data."""
     assert os.path.isfile(filepath), f"No file found at {filepath}"
     try:
         with open(filepath, 'r') as f:
@@ -127,138 +129,10 @@ def get_data_from_json(filepath, depth=-1):
                         filtered_data.append(event)
                     else:
                         print("Filtered out an event.")
-
                 return filtered_data
 
-
-            # for really large files:
-            # with mmap.mmap(f.fileno(), length=0, access=mmap.ACCESS_READ) as mm:
-            #     return orjson.loads(mm.read(mm.size()))
     except FileNotFoundError as e:
         sys.exit(f"Could not find {filepath}")
-
-
-def chunk_list(lst, chunk_size):
-    for i in range(0, len(lst), chunk_size):
-        yield lst[i:i + chunk_size]
-
-
-def process_chunk(chunk, files_dir):
-    convert_cali_to_json(chunk, files_dir)
-
-
-@log_timed()
-def unpack_cali():
-    cali_dir = os.path.join(files_dir, "cali")
-    input_files = [os.path.join(cali_dir, filename) for filename in os.listdir(cali_dir) if filename.endswith(".cali")]
-
-    if len(input_files) == 0:
-        return {"message": "No input .cali file was found."}
-
-    # Determine the number of CPU cores
-    num_cores = os.cpu_count()
-    chunk_size = max(1, len(input_files) // num_cores)  # Adjust chunk size based on the number of CPU cores
-
-    chunks = list(chunk_list(input_files, chunk_size))
-
-    with concurrent.futures.ProcessPoolExecutor() as executor:
-        futures = [executor.submit(process_chunk, chunk, files_dir) for chunk in chunks]
-        for future in concurrent.futures.as_completed(futures):
-            future.result()
-
-    aggregate_metadata(files_dir)
-    remove_existing_files(os.path.join(files_dir, "metadata", "procs"))
-
-
-@app.post("/api/upload")
-async def upload_cali_files(files: List[UploadFile] = File(...)):
-    remove_existing_files(files_dir)
-    create_files_directory(files_dir)
-    cali_dir = os.path.join(files_dir, "cali")
-
-    for file in files:
-        try:
-            contents = await file.read()
-            with open(f"{cali_dir}/{file.filename}", "wb") as f:
-                f.write(contents)
-        except Exception as e:
-            return {"message": f"There was an error uploading {file.filename}: {e}"}
-        finally:
-            await file.close()
-
-    unpack_cali()
-
-    return {"message": "Successfully uploaded files."}
-
-
-# This endpoint doesn't use the rank at all for now
-@app.get("/api/metadata/{depth}/{rank}")
-@log_timed()
-def get_metadata(depth):
-    metadata_dir = os.path.join(files_dir, "metadata")
-    filename = f"metadata.json"
-    filepath = os.path.join(metadata_dir, filename)
-
-    if not os.path.isfile(filepath):
-        # TODO: Add error handling
-        pass
-
-    return get_data_from_json(filepath)
-
-
-@app.get("/api/eventsplot/{depth}/{rank}")
-@log_timed()
-def get_eventsplot_data(depth, rank):
-    print("Events Plot received depth: ", depth)
-    events_dir = os.path.join(files_dir, "events")
-    filename = f"events-{rank}.json"
-    filepath = os.path.join(events_dir, filename)
-
-    if not os.path.isfile(filepath):
-        # TODO: Add error handling
-        pass
-
-    return get_data_from_json(filepath, depth=int(depth))
-
-# Does not use rank or depth for now
-@app.get("/api/analysisviewer/{depth}/{rank}")
-@log_timed()
-def get_analysisviewer_data(depth, rank):
-    analysis_dir = os.path.join(files_dir, "analysis")
-
-    filename = f"all_ranks_analyzed.json"
-    filepath = os.path.join(analysis_dir, filename)
-
-    if not os.path.isfile(filepath):
-        # TODO: Add error handling
-        # (slightly different because this one SHOULD fail at first)
-        print(f"Did not find {filepath}.")
-        return None
-
-    # Read in the data
-    return get_data_from_json(filepath)
-
-@app.get("/api/logical_hierarchy/{ftn_id}/{depth}/{rank}")
-@log_timed()
-def get_logical_hierarchy_data(ftn_id, depth, rank):
-    unique_dir = os.path.join(files_dir, "unique-events")
-
-    logical_dir = os.path.join(files_dir, "logical_hierarchy")
-
-    root_desc = "root" if ftn_id == "-1" else f"root_{ftn_id}"
-    depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
-    filename = f"logical_hierarchy_rank_{rank}_root_{root_desc}_{depth_desc}.json"
-    filepath = os.path.join(logical_dir, filename)
-
-    unique_events_file = os.path.join(unique_dir, f"unique-events-{rank}.json")
-    if not os.path.isfile(filepath):
-        if not os.path.isfile(unique_events_file):
-            # TODO: Add error handling
-            pass
-        generate_logical_hierarchy_from_root(unique_events_file, filepath, ftn_id=int(ftn_id), depth=int(depth))
-
-    return get_data_from_json(filepath)
-
 
 @app.get("/api/util/vizcomponents")
 @log_timed()
@@ -275,6 +149,134 @@ def get_available_viz_componenents():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+###################################
+###           Logging           ###
+###################################
+
+
+@app.get("/set-log-level/{log_level}")
+def set_log_level_endpoint(log_level: str):
+    """API endpoint to change the log level dynamically."""
+    try:
+        message = set_log_level(log_level)
+        return {"message": message}
+    except ValueError as e:
+        return {"error": str(e)}
+
+
+###################################
+###         File Upload         ###
+###################################
+
+
+def chunk_list(lst, chunk_size):
+    """Divide the given list into a set of chunks with size chunk_size."""
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i:i + chunk_size]
+
+@app.post("/api/unpack")
+def unpack_cali():
+    """
+    Called from the FileUploadButton; reads all of the files in the cali
+    directory and converts them to JSON.
+    """
+    cali_dir = os.path.join(files_dir, "cali")
+    input_files = [os.path.join(cali_dir, filename) for filename in os.listdir(cali_dir)]
+
+    if len(input_files) == 0:
+        return {"message": "No input .cali file was found."}
+
+    # Determine the number of CPU cores
+    num_cores = os.cpu_count()
+    chunk_size = max(1, len(input_files) // num_cores)  # Adjust chunk size based on the number of CPU cores
+
+    chunks = list(chunk_list(input_files, chunk_size))
+
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        futures = [executor.submit(convert_cali_to_json, chunk, files_dir) for chunk in chunks]
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
+
+    aggregate_metadata(files_dir)
+    remove_existing_files(os.path.join(files_dir, "metadata", "procs"))
+
+@app.post("/api/upload")
+async def upload_cali_files(files: List[UploadFile] = File(...)):
+    """
+    Called from the FileUploadButton; takes in the full list of .cali files
+    and writes them to the local cali directory.
+    """
+    cali_dir = os.path.join(files_dir, "cali")
+    for file in files:
+        try:
+            contents = await file.read()
+            async with aiofiles.open(f"{cali_dir}/{file.filename}", "wb") as f:
+                await f.write(contents)
+        except Exception as e:
+            return {"message": f"There was an error uploading {file.filename}: {e}"}
+        finally:
+            await file.close()
+    return {"message": "Successfully uploaded files."}
+
+
+###################################
+###      Viz API Endpoints      ###
+###################################
+
+
+# Summary Table
+@app.get("/api/metadata/{depth}/{rank}")
+@log_timed()
+def get_metadata():
+    metadata_dir = os.path.join(files_dir, "metadata")
+    filename = f"metadata.json"
+    filepath = os.path.join(metadata_dir, filename)
+    return get_data_from_json(filepath)
+
+# Events Plot
+@app.get("/api/eventsplot/{depth}/{rank}")
+@log_timed()
+def get_eventsplot_data(depth, rank):
+    events_dir = os.path.join(files_dir, "events")
+    filename = f"events-{rank}.json"
+    filepath = os.path.join(events_dir, filename)
+    return get_data_from_json(filepath, depth=int(depth))
+
+# Analysis Viewer
+@app.get("/api/analysisviewer/{depth}/{rank}")
+@log_timed()
+def get_analysisviewer_data():
+    analysis_dir = os.path.join(files_dir, "analysis")
+    filename = f"all_ranks_analyzed.json"
+    filepath = os.path.join(analysis_dir, filename)
+    if not os.path.isfile(filepath):
+        return None
+    return get_data_from_json(filepath)
+
+# Proportion Analyzer and Call Tree
+@app.get("/api/logical_hierarchy/{ftn_id}/{depth}/{rank}")
+@log_timed()
+def get_logical_hierarchy_data(ftn_id, depth, rank):
+    unique_dir = os.path.join(files_dir, "unique-events")
+    logical_dir = os.path.join(files_dir, "logical_hierarchy")
+
+    root_desc = "root" if ftn_id == "-1" else f"root_{ftn_id}"
+    depth_desc = "depth_full" if depth == "-1" else f"depth_{depth}"
+    filename = f"logical_hierarchy_rank_{rank}_root_{root_desc}_{depth_desc}.json"
+    filepath = os.path.join(logical_dir, filename)
+
+    unique_events_file = os.path.join(unique_dir, f"unique-events-{rank}.json")
+    if not os.path.isfile(filepath):
+        generate_logical_hierarchy_from_root(unique_events_file, filepath, ftn_id=int(ftn_id), depth=int(depth))
+
+    return get_data_from_json(filepath)
+
+
+####################################
+###           Analysis           ###
+####################################
+
+
 @app.get("/api/analysis/representativerank")
 @log_timed()
 def get_representative_rank():
@@ -282,17 +284,14 @@ def get_representative_rank():
         # this is quite barebones; this will need to handle depth selection,
         # and function type selection (ie cluster based on kokkos, mpi, user, etc. functions)
         analysis_dir = os.path.join(files_dir, "analysis")
-
         filename = f"representative_rank.json"
         filepath = os.path.join(analysis_dir, filename)
-
         if not os.path.isfile(filepath):
             analyze_representative_rank()
-
         return get_data_from_json(filepath)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/api/analysis/rankclusters")
 @log_timed()
@@ -301,14 +300,12 @@ def get_rank_clusters():
         # this is quite barebones; this will need to handle depth selection,
         # and function type selection (ie cluster based on kokkos, mpi, user, etc. functions)
         analysis_dir = os.path.join(files_dir, "analysis")
-
         filename = f"rank_clusters.json"
         filepath = os.path.join(analysis_dir, filename)
-
         if not os.path.isfile(filepath):
             analyze_representative_rank()
-
         return get_data_from_json(filepath)
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -388,24 +385,19 @@ def analyze_representative_rank():
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(json_response, f, ensure_ascii=False, indent=4)
 
-
 @app.get("/api/analysis/timeslices")
 @log_timed()
 def get_timeslices():
     try:
         analysis_dir = os.path.join(files_dir, "analysis")
-
         filename = f"timeslices.json"
         filepath = os.path.join(analysis_dir, filename)
-
         if not os.path.isfile(filepath):
             analyze_timeslices()
-
         return get_data_from_json(filepath)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @log_timed()
 def analyze_timeslices():
