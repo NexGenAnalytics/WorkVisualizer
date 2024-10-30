@@ -1,5 +1,5 @@
 
-<img src="app/workvisualizer/public/wv_readme_wordmark.png">
+<img src="media/wv_readme_wordmark.png">
 
 ---
 
