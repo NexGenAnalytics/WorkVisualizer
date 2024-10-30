@@ -7,10 +7,6 @@ The **WorkVisualizer** is an interactive, high-level performance analysis tool f
 
 <br>
 
-<br>
-
-<br>
-
 ## Your Application's Execution, _Visualized_
 
 Is your parallel program **losing time**?
@@ -26,10 +22,14 @@ Are you **wasting developer time** searching for the problem?
   <figcaption>Analysis Viewer: Easily determine where your application is losing time.</figcaption>
 </figure>
 
+<br>
+
 <figure>
   <img src="media/proportion_analyzer.png" alt="analysis_viewer" width="400">
   <figcaption>Proportion Analyzer: See where your application spends its time.</figcaption>
 </figure>
+
+<br>
 
 <figure>
   <img src="media/events_plot.png" alt="analysis_viewer" width="400">
