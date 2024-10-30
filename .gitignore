@@ -1,8 +1,0 @@
-data
-!data/cali/md*
-misc/plots
-misc/hierarchies
-app/workvisualizer/api/files/*
-app/workvisualizer/tests/data/*
-!app/workvisualizer/tests/data/cali
-app.log*
