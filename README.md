@@ -36,8 +36,9 @@ Are you **wasting developer time** searching for the problem?
   <figcaption>Events Plot: View an interactive, trace-like visualization of your application's execution.</figcaption>
 </figure>
 
-> [!NOTE]
-> All sample data comes from [CabanaMD](https://github.com/ECP-copa/CabanaMD).
+<br>
+
+> _Note: All sample data comes from [CabanaMD](https://github.com/ECP-copa/CabanaMD)._
 
 
 <!-- HOW TO EMBED A YOUTUBE VIDEO -->
