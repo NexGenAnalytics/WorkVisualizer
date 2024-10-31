@@ -48,6 +48,8 @@ h1 {
     font-size: 2.5rem;
     font-style: italic;
     margin-bottom: 50px;
+    width: 75%;
+    margin: 0 auto 50px;
 }
 
 .social-icons {
@@ -100,8 +102,7 @@ strong {
     margin: 20px auto;
     overflow: hidden;
     text-align: center;
-    max-width: 1500px;
-    max-height: 1500px;
+    max-width: 100%;
 }
 
 .carousel-item {
@@ -113,7 +114,7 @@ strong {
 }
 
 .carousel img {
-    width: auto;
+    width: 100%;
     height: 500px;
     object-fit: contain;
     border-radius: 8px;
@@ -150,4 +151,35 @@ strong {
 
 .carousel-control:hover {
     background-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+    .logo {
+        width: 100%; /* Full width on mobile */
+        max-width: 100%;
+    }
+
+    .subtitle {
+        width: 75%; /* Limit subtitle width to 75% */
+        font-size: 1.5rem; /* Reduce font size for smaller screens */
+    }
+
+    .carousel img {
+        width: 100%; /* Keep carousel images within the screen width */
+        height: 300px; /* Set consistent height for mobile */
+    }
+
+    .carousel-control {
+        font-size: 1.5rem; /* Smaller controls on mobile */
+        padding: 5px;
+    }
+
+    .prev {
+        left: 20px; /* Bring controls closer to the image on mobile */
+    }
+
+    .next {
+        right: 20px;
+    }
 }
