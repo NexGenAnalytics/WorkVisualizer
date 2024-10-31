@@ -91,6 +91,8 @@ strong {
     margin: 20px auto;
     overflow: hidden;
     text-align: center;
+    max-width: 1000px;
+    max-height: 1000px;
 }
 
 .carousel-item {
