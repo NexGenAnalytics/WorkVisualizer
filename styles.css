@@ -6,7 +6,7 @@
 }
 
 html, body {
-    height: 100%;
+    height: auto;
 }
 
 body {
@@ -21,7 +21,7 @@ body {
 
 .container {
     text-align: center;
-    width: 90%;
+    width: auto;
     height: auto;
 }
 
@@ -30,8 +30,8 @@ header {
 }
 
 .logo {
-    width: 90%;
-    max-width: 10000px;
+    width: auto;
+    max-width: 5000px;
     margin-bottom: 10px;
 }
 
