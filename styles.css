@@ -1,0 +1,88 @@
+/* General reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #000;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    text-align: center;
+    width: 80%;
+    max-width: 800px;
+}
+
+header {
+    margin-bottom: 20px;
+}
+
+.logo {
+    height: 80px;
+    margin-bottom: 10px;
+}
+
+h1 {
+    font-size: 3rem;
+    font-weight: bold;
+}
+
+.highlight {
+    color: #3498db; /* Blue color to highlight "Work" */
+}
+
+.subtitle {
+    font-size: 1.2rem;
+    font-style: italic;
+    margin-bottom: 20px;
+}
+
+.social-icons img {
+    width: 30px;
+    margin: 0 10px;
+}
+
+.content h2 {
+    font-size: 1.5rem;
+    margin-top: 30px;
+}
+
+ul {
+    list-style: none;
+    margin: 20px 0;
+}
+
+li {
+    font-size: 1.1rem;
+    margin: 5px 0;
+}
+
+strong {
+    font-weight: bold;
+}
+
+.video-placeholder {
+    width: 300px;
+    height: 180px;
+    background-color: #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+}
+
+.play-button {
+    width: 30px;
+    height: 30px;
+    border: 15px solid transparent;
+    border-left: 20px solid black;
+    margin-left: 5px;
+}
