@@ -5,6 +5,10 @@
     box-sizing: border-box;
 }
 
+html, body {
+    height: 100%;
+}
+
 body {
     background-color: #000;
     color: #fff;
@@ -17,8 +21,8 @@ body {
 
 .container {
     text-align: center;
-    width: 80%;
-    max-width: 800px;
+    width: 90%;
+    height: auto;
 }
 
 header {
@@ -26,8 +30,7 @@ header {
 }
 
 .logo {
-    width: 60%;
-    max-width: 500px;
+    width: 90%;
     margin-bottom: 10px;
 }
 
@@ -83,7 +86,7 @@ strong {
 
 .carousel {
     position: relative;
-    width: 800px; /* Adjust width as needed */
+    width: 100%;
     margin: 20px auto;
     overflow: hidden;
     text-align: center;
@@ -133,5 +136,5 @@ strong {
 }
 
 .carousel-control:hover {
-    background-color: rgba(0, 0, 0, 0.8);
+    background-color: rgba(255, 255, 255, 0.8);
 }
