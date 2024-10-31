@@ -162,7 +162,7 @@ strong {
 
     .subtitle {
         width: 75%; /* Limit subtitle width to 75% */
-        font-size: 1.0rem; /* Reduce font size for smaller screens */
+        font-size: 1.25rem; /* Reduce font size for smaller screens */
     }
 
     .carousel img {
