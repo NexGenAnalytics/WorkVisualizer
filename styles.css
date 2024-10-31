@@ -26,7 +26,8 @@ header {
 }
 
 .logo {
-    height: 80px;
+    width: 60%;
+    max-width: 500px;
     margin-bottom: 10px;
 }
 
@@ -36,7 +37,7 @@ h1 {
 }
 
 .highlight {
-    color: #3498db; /* Blue color to highlight "Work" */
+    color: #028bc5;
 }
 
 .subtitle {
@@ -45,9 +46,20 @@ h1 {
     margin-bottom: 20px;
 }
 
+.social-icons {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin: 15px 0;
+}
+
 .social-icons img {
-    width: 30px;
-    margin: 0 10px;
+    width: 35px;
+    transition: transform 0.3s;
+}
+
+.social-icons img:hover {
+    transform: scale(1.1);
 }
 
 .content h2 {
@@ -69,20 +81,57 @@ strong {
     font-weight: bold;
 }
 
-.video-placeholder {
-    width: 300px;
-    height: 180px;
-    background-color: #ccc;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto;
+.carousel {
+    position: relative;
+    width: 300px; /* Adjust width as needed */
+    margin: 20px auto;
+    overflow: hidden;
+    text-align: center;
 }
 
-.play-button {
-    width: 30px;
-    height: 30px;
-    border: 15px solid transparent;
-    border-left: 20px solid black;
-    margin-left: 5px;
+.carousel-item {
+    display: none; /* Hide all items initially */
+}
+
+.carousel-item.active {
+    display: block; /* Show only the active item */
+}
+
+.carousel img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.caption {
+    margin-top: 10px;
+    font-size: 1rem;
+    color: #ddd;
+}
+
+.carousel-control {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 2rem;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.5);
+    border: none;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 50%;
+    user-select: none;
+}
+
+.prev {
+    left: 10px;
+}
+
+.next {
+    right: 10px;
+}
+
+.carousel-control:hover {
+    background-color: rgba(0, 0, 0, 0.8);
 }

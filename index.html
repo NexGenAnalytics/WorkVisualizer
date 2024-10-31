@@ -13,8 +13,9 @@
             <p class="subtitle">An <em>interactive</em> performance analysis tool</p>
         </header>
         <div class="social-icons">
-            <a href="#"><img src="media/github_logo.png" alt="GitHub icon"></a>
-            <a href="#"><img src="media/linkedin_logo.png" alt="LinkedIn icon"></a>
+            <a href="https://ng-analytics.com"><img src="media/nga_icon_white.png" alt="NGA icon"></a>
+            <a href="https://github.com/NexGenAnalytics/WorkVisualizer"><img src="media/github_icon.png" alt="GitHub icon"></a>
+            <a href="https://www.linkedin.com/company/nexgenanalyticslc/"><img src="media/linkedin_icon.png" alt="LinkedIn icon"></a>
         </div>
         <section class="content">
             <h2>Your Application’s Execution, <em>Visualized</em>.</h2>
@@ -24,10 +25,44 @@
                 <li>Are you <strong>wasting computer resources</strong> with inefficient code?</li>
                 <li>Are you <strong>wasting developer time</strong> searching for the problem?</li>
             </ul>
-            <div class="video-placeholder">
-                <div class="play-button"></div>
+            <div class="carousel">
+                <div class="carousel-item active">
+                    <img src="media/analysis_viewer_slices.png" alt="Image 1">
+                    <p class="caption"><b>Analysis Viewer</b>: Determine where time is lost in your program.</p>
+                </div>
+                <div class="carousel-item">
+                    <img src="media/events_plot.png" alt="Image 2">
+                    <p class="caption"><b>Events Plot</b>: View a trace-like visualization of the app's execution.</p>
+                </div>
+                <div class="carousel-item">
+                    <img src="media/proportion_analyzer.png" alt="Image 3">
+                    <p class="caption"><b>Proportion Analyzer</b>: Find which functions take the most time.</p>
+                </div>
+                <button class="carousel-control prev" onclick="prevSlide()">&#10094;</button>
+                <button class="carousel-control next" onclick="nextSlide()">&#10095;</button>
             </div>
         </section>
     </div>
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.carousel-item');
+
+        function showSlide(index) {
+            // Wrap the index for infinite looping
+            currentSlide = (index + slides.length) % slides.length;
+
+            // Hide all slides and show only the current one
+            slides.forEach((slide, idx) => {
+                slide.classList.toggle('active', idx === currentSlide);
+            });
+        }
+
+        function nextSlide() { showSlide(currentSlide + 1); }
+        function prevSlide() { showSlide(currentSlide - 1); }
+
+        // Initialize the carousel by showing the first slide
+        showSlide(currentSlide);
+    </script>
 </body>
 </html>
+
