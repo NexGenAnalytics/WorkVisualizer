@@ -87,7 +87,7 @@ strong {
 
 .carousel {
     position: relative;
-    width: 100%;
+    width: 60%;
     margin: 20px auto;
     overflow: hidden;
     text-align: center;
@@ -102,7 +102,7 @@ strong {
 }
 
 .carousel img {
-    width: 100%;
+    width: 60%;
     height: auto;
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
