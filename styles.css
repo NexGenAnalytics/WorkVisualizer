@@ -83,7 +83,7 @@ strong {
 
 .carousel {
     position: relative;
-    width: 300px; /* Adjust width as needed */
+    width: 800px; /* Adjust width as needed */
     margin: 20px auto;
     overflow: hidden;
     text-align: center;
@@ -125,11 +125,11 @@ strong {
 }
 
 .prev {
-    left: 10px;
+    left: 50px;
 }
 
 .next {
-    right: 10px;
+    right: 50px;
 }
 
 .carousel-control:hover {
