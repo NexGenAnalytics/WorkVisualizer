@@ -45,7 +45,7 @@ h1 {
 }
 
 .subtitle {
-    font-size: 2.5rem;
+    font-size: 2.0rem;
     font-style: italic;
     margin-bottom: 50px;
     width: 75%;
@@ -190,16 +190,29 @@ strong {
     background-color: rgba(255, 255, 255, 0.8);
 }
 
+.standard {
+    margin-bottom: 40px;
+}
+
+.footer {
+    margin-bottom: 40px
+}
+
 /* Mobile Styles */
 @media (max-width: 768px) {
     .logo {
-        width: 100%; /* Full width on mobile */
+        width: 100%;
         max-width: 100%;
     }
 
     .subtitle {
-        width: 75%; /* Limit subtitle width to 75% */
-        font-size: 1.25rem; /* Reduce font size for smaller screens */
+        width: 75%;
+        font-size: 1.25rem;
+        margin-bottom: 30px;
+    }
+
+    .social-icons {
+        margin-bottom: 30px;
     }
 
     .video-section {
