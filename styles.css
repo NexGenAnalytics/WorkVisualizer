@@ -252,4 +252,8 @@ strong {
     .next {
         right: 20px;
     }
+
+    .demo-video {
+        width: 90%;
+    }
 }
