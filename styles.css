@@ -226,9 +226,19 @@ strong {
         text-align: center;
     }
 
+    .text-container, .video-container {
+        flex: 1;
+        max-width: 80vw;
+    }
+
+    .video-container {
+        padding-left: 0px;
+    }
+
     .text-container {
         text-align: center;
         margin-top: 20px;
+        padding-right: 0px;
     }
 
     .text-container ul {
@@ -258,8 +268,7 @@ strong {
         right: 20px;
     }
 
-    .demo-video {
-        max-width: 768px;
+    .demo-video iframe {
         width: 90%;
     }
 }
