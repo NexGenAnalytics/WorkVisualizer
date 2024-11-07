@@ -30,8 +30,7 @@ header {
 }
 
 .logo {
-    width: auto;
-    max-width: 2000px;
+    width: 100%;
     margin-bottom: 0px;
 }
 
