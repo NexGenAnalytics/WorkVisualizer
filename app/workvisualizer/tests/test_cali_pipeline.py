@@ -31,7 +31,7 @@ class TestConfig(unittest.TestCase):
         # Read in the cali files
         cali_files = [os.path.join(self.cali_dir, filename) for filename in os.listdir(self.cali_dir) if
                       filename.endswith(".cali")]
-        convert_cali_to_json(cali_files, self.data_dir, maximum_depth_limit=2)
+        convert_cali_to_json(cali_files, self.data_dir)
         aggregate_metadata(self.data_dir)
 
         # Now test that the logical hierarchy is created correctly

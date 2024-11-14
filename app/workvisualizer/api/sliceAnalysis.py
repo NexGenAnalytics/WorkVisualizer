@@ -26,16 +26,24 @@ Output:
 
 def split_events_into_slices(events, slices):
     """Split the events data into the slices."""
-    # slice_ids = list(slices.keys())
     slice_ids = list(range(len(slices)))
     rank_slices = {slice_id: [] for slice_id in slice_ids}
     slice_id_iterator = 0
+
     for event in events:
-        current_slice_id = slice_ids[slice_id_iterator]
-        current_slice = slices[current_slice_id]
-        if event["ts"] > current_slice[1]:
-            slice_id_iterator += 1
-        rank_slices[current_slice_id].append(event)
+        while slice_id_iterator < len(slice_ids):
+            current_slice_id = slice_ids[slice_id_iterator]
+            current_slice = slices[current_slice_id]
+
+            if event["ts"] <= current_slice[1]:
+                rank_slices[current_slice_id].append(event)
+                break
+            else:
+                slice_id_iterator += 1
+
+            if slice_id_iterator >= len(slice_ids):
+                break
+
     return rank_slices
 
 def calculate_slice_stats(rank_slices):
@@ -56,7 +64,7 @@ def calculate_slice_stats(rank_slices):
         }
     return slice_stats
 
-def find_rank_slices_with_most_time_lost(all_slices, slice_id=None, num_entries=None):
+def sort_rank_slices_by_time_lost(all_slices, slice_id=None, num_entries=None):
 
     # Isolate only requested slice
     if slice_id is not None:
@@ -68,39 +76,39 @@ def find_rank_slices_with_most_time_lost(all_slices, slice_id=None, num_entries=
             raise TypeError("slice_id should be an int or list of ints")
 
     # Sort the list by the time lost (in descending order)
-    all_slices.sort(key=lambda x: x["time_lost"])
+    all_slices.sort(key=lambda x: x["time_lost"], reverse=True)
 
     # Initialize ranks/slices with most time lost
-    most_time_lost = {}
+    # most_time_lost = {}
 
     # User specifies top num_entries
-    if num_entries is not None:
-        iter = 0
-        while iter < num_entries and iter < len(all_slices):
-            entry = all_slices[iter]
-            slice_id = entry["slice"]
-            if slice_id not in most_time_lost:
-                most_time_lost[slice_id] = []
-            most_time_lost[slice_id].append(entry)
-            iter += 1
+    # if num_entries is not None:
+    #     iter = 0
+    #     while iter < num_entries and iter < len(all_slices):
+    #         entry = all_slices[iter]
+    #         slice_id = entry["slice"]
+    #         if slice_id not in most_time_lost:
+    #             most_time_lost[slice_id] = []
+    #         most_time_lost[slice_id].append(entry)
+    #         iter += 1
 
-    # Determine some stat for reporting
-    else:
-        total_time_lost = sum(entry["time_lost"] for entry in all_slices)
-        mean_time_lost = total_time_lost / len(all_slices)
-        var = sum((entry["time_lost"] - mean_time_lost) ** 2 for entry in all_slices) / len(all_slices)
-        sigma = math.sqrt(var)
+    # # Determine some stat for reporting
+    # else:
+    #     total_time_lost = sum(entry["time_lost"] for entry in all_slices)
+    #     mean_time_lost = total_time_lost / len(all_slices)
+    #     var = sum((entry["time_lost"] - mean_time_lost) ** 2 for entry in all_slices) / len(all_slices)
+    #     sigma = math.sqrt(var)
 
-        # Look for slices greater than mean + 2*sigma
-        threshold_time_lost = mean_time_lost + 2 * sigma
-        for entry in all_slices:
-            if entry["time_lost"] > threshold_time_lost:
-                slice_id = entry["slice"]
-                if slice_id not in most_time_lost:
-                    most_time_lost[slice_id] = []
-                most_time_lost[slice_id].append(entry)
+    #     # Look for slices greater than mean + 2*sigma
+    #     threshold_time_lost = mean_time_lost + 2 * sigma
+    #     for entry in all_slices:
+    #         if entry["time_lost"] > threshold_time_lost:
+    #             slice_id = entry["slice"]
+    #             if slice_id not in most_time_lost:
+    #                 most_time_lost[slice_id] = []
+    #             most_time_lost[slice_id].append(entry)
 
-    return most_time_lost
+    return all_slices
 
 def find_time_losing_slices(all_slices):
     """Aggregates across all ranks to get the total time lost for each slice."""
@@ -108,9 +116,9 @@ def find_time_losing_slices(all_slices):
     for entry in all_slices:
         slice_id = entry['slice']
         if slice_id not in total_time_lost_per_slice:
-            total_time_lost_per_slice[entry['slice']] = entry['time_lost']
+            total_time_lost_per_slice[slice_id] = entry['time_lost']
         else:
-            total_time_lost_per_slice[entry['slice']] += entry['time_lost']
+            total_time_lost_per_slice[slice_id] += entry['time_lost']
     return total_time_lost_per_slice
 
 def process_file(filepath, repr_slice_stats, num_slices, slices):
@@ -150,7 +158,7 @@ def process_file(filepath, repr_slice_stats, num_slices, slices):
     for slice_id in slice_ids:
 
         # First, calculate the time lost in Allreduce functions
-        time_lost = slice_stats[slice_id]["type times"]["mpi_collective"] - repr_slice_stats[slice_id]["type times"]["mpi_collective"]
+        time_lost = repr_slice_stats[slice_id]["type times"]["mpi_collective"] - slice_stats[slice_id]["type times"]["mpi_collective"]
 
         # Compute percent difference for total number of events
         repr_num_events = repr_slice_stats[slice_id]["num_events"]
@@ -241,7 +249,7 @@ def run_slice_analysis(files_dir, representative_rank, representative_slices):
     all_slices = analyze_slices(events_dir, representative_rank, representative_slices)
 
     # Isolate ranks that lose time
-    time_losing_rank_slices = find_rank_slices_with_most_time_lost(all_slices, num_entries=1)
+    time_losing_rank_slices = sort_rank_slices_by_time_lost(all_slices, num_entries=1)
 
     # Aggregate across all ranks to find time-losing slices
     time_losing_slices = find_time_losing_slices(all_slices)
@@ -249,6 +257,10 @@ def run_slice_analysis(files_dir, representative_rank, representative_slices):
     # Create the analysis dir (if it doesn't exist)
     analysis_dir = os.path.join(files_dir, "analysis")
     os.makedirs(analysis_dir, exist_ok=True)
+
+    # Write out the data for all ranks
+    with open(os.path.join(analysis_dir, "all_ranks_analyzed.json"), "w") as all_ranks_json:
+        json.dump(all_slices, all_ranks_json, indent=4)
 
     # Write out the data for time-losing ranks
     with open(os.path.join(analysis_dir, "time_lost_ranks.json"), "w") as ranks_json:
