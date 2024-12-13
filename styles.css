@@ -30,7 +30,7 @@ header {
 }
 
 .logo {
-    width: 100%;
+    width: 85%;
     margin-bottom: 0px;
 }
 
@@ -199,6 +199,8 @@ strong {
 }
 
 .footer {
+    width: 50%;
+    margin: 0 auto;
     margin-bottom: 40px
 }
 
@@ -268,6 +270,10 @@ strong {
     }
 
     .demo-video iframe {
+        width: 90%;
+    }
+
+    .footer {
         width: 90%;
     }
 }
