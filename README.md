@@ -14,6 +14,7 @@ Jump to:
   - [Opening the App](#opening-the-app)
   - [Using the App](#using-the-app)
   - [Caveats](#caveats)
+- [Credits](#credits)
 
 ---
 
@@ -156,3 +157,7 @@ Currently, the WorkVisualizer requires that an application meet the following cr
 2. Features MPI collective calls
 
 Additionally, while the WorkVisualizer has been tested to work on up to 1024 ranks, latency becomes apparent as the number of ranks surpasses 100. Future work will greatly improve the scalability. For now, consider testing your code with smaller runs (both shorter durations and fewer ranks).
+
+## Credits
+
+The WorkVisualizer 1.0.0-alpha was supported by the U.S. Department of Energy, Office of Science, Office of Advanced Scientific Computing Research through the Small Business Innovation Research (SBIR) Program, under SBIR Phase I Award DE-SC-0024832.
