@@ -16,6 +16,8 @@ Jump to:
   - [Caveats](#caveats)
 - [Credits](#credits)
 
+_Note: All future development of the WorkVisualizer will be private. Email info@ng-analytics.com for more information regarding future plans for WorkVisualizer.__
+
 ---
 
 ## Overview
