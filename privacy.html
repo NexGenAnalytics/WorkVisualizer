@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy Policy — WorkVisualizer</title>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+  />
+  <link rel="icon" href="assets/favicon.png" />
+  <style>
+    main.container { max-width: 860px }
+    header { margin: 1.5rem 0 0.5rem }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>Privacy Policy</h1>
+      <p class="muted">Last updated <span id="date"></span></p>
+    </header>
+
+    <article>
+      <p>
+        We collect information you submit via the waitlist form, including your name, email,
+        organization, role, and any message you provide. We use this information to:
+      </p>
+      <ul>
+        <li>Send important development updates and release announcements;</li>
+        <li>Invite selected users to early access programs;</li>
+        <li>Understand product interest across domains to improve WorkVisualizer.</li>
+      </ul>
+      <h3>Legal Basis</h3>
+      <p>
+        Our legal basis for processing is your consent (GDPR Art. 6(1)(a)). You may withdraw consent at any time
+        by emailing <a href="mailto:info@ng-analytics.com">info@ng-analytics.com</a>.
+      </p>
+      <h3>Retention</h3>
+      <p>
+        We retain your information until you request deletion or until the early-access program and associated communications conclude.
+      </p>
+      <h3>Sharing</h3>
+      <p>
+        We do not sell your personal data. We use Formspree to process form submissions (acting as our processor).
+        Data may be stored in the United States. We have appropriate agreements in place with our processors.
+      </p>
+      <h3>Your Rights</h3>
+      <p>
+        Depending on your jurisdiction, you may have rights to access, rectify, delete, restrict, or port your data.
+        To exercise these rights, contact <a href="mailto:info@ng-analytics.com">info@ng-analytics.com</a>.
+      </p>
+      <h3>Contact</h3>
+      <p>
+        NexGen Analytics L.C.<br />
+        30 N. Gould St, Suite 5912<br />
+        Sheridan, WY 82801<br />
+        U.S.A.<br />
+        Email: <a href="mailto:info@ng-analytics.com">info@ng-analytics.com</a>
+      </p>
+      <p><a href="index.html">&larr; Back to site</a></p>
+    </article>
+  </main>
+  <script>
+    const d = new Date();
+    document.getElementById('date').textContent = d.toLocaleDateString(undefined, {year:'numeric', month:'long', day:'numeric'});
+  </script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+/* Layout tweaks */
+:root {
+  --brand: hsl(200 100% 55%);
+  --brand-2: hsl(200 100% 65%);
+  --radius-xl: 1.25rem;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+header.navbar {
+  padding-top: 0rem;
+  padding-bottom: 0rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: saturate(180%) blur(10px);
+  background: color-mix(in oklab, var(--pico-background-color), transparent 15%);
+  border-bottom: 1px solid color-mix(in oklab, var(--pico-muted-border-color), transparent 50%);
+  min-height: unset;
+}
+
+header.navbar .brand {
+  align-items: center;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: .8rem;
+  font-weight: 700;
+  letter-spacing: .2px;
+  white-space: nowrap;
+}
+
+.brand-logo {
+  width: 80px;
+  /* tweak to fit your design */
+  height: auto;
+  display: inline-block;
+}
+
+.brand-name {
+  font-weight: 800;
+  font-size: clamp(1.15rem, 1rem + 1.2vw, 1.9rem);
+  letter-spacing: .2px;
+}
+
+
+
+.hero {
+  padding: 5rem 0 3rem;
+  text-align: center;
+}
+
+.hero h1 {
+  font-size: clamp(2.2rem, 2.6rem + 1.2vw, 4rem);
+  line-height: 1.05;
+  margin-bottom: 1rem;
+}
+
+.hero p.lead {
+  font-size: clamp(1.05rem, 1rem + .4vw, 1.25rem);
+  color: var(--pico-muted-color);
+  max-width: 900px;
+  margin: 0 auto 1.5rem;
+}
+
+.actions {
+  display: flex;
+  gap: .75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 1.25rem 0 0;
+}
+
+.btn-primary {
+  --pico-background-color: var(--brand);
+  --pico-color: hsl(210 30% 10%);
+  --pico-border-color: transparent;
+}
+
+/* Screenshot with border and bottom fade */
+.screenshot-wrap {
+  margin: 2.5rem auto 0;
+  max-width: 1100px;
+  border: 1px solid color-mix(in oklab, var(--pico-muted-border-color), transparent 10%);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: linear-gradient(180deg,
+      color-mix(in oklab, var(--pico-card-background-color), transparent 10%) 0%,
+      color-mix(in oklab, var(--pico-card-background-color), transparent 0%) 100%);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+  position: relative;
+}
+
+.screenshot {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* Fade out bottom using CSS mask */
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0) 100%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* Sections */
+section {
+  scroll-margin-top: 88px;
+}
+
+.section-header {
+  margin: 3.5rem 0 1.25rem;
+  text-align: center;
+}
+
+.muted {
+  color: var(--pico-muted-color);
+}
+
+/* Product features */
+.feature {
+  align-items: center;
+  gap: 2rem;
+}
+
+.feature+.feature {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  /* border-top: 1px dashed color-mix(in oklab, var(--pico-muted-border-color), transparent 30%); */
+}
+
+.feature article {
+  padding: 2rem;
+}
+
+.feature h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: 1rem;
+}
+
+.feature .icon {
+  width: 22px;
+  height: 22px;
+  color: var(--brand-2);
+  flex: 0 0 auto;
+}
+
+.feature img {
+  width: 100%;
+  height: auto;
+  border-radius: .9rem;
+  border: 1px solid color-mix(in oklab, var(--pico-muted-border-color), transparent 20%);
+}
+
+/* Solutions cards */
+.solutions {
+  margin-top: 1rem;
+}
+
+.solutions article {
+  border-radius: var(--radius-xl);
+  padding: 1.25rem;
+  height: 100%;
+  border: 1px solid color-mix(in oklab, var(--pico-muted-border-color), transparent 20%);
+  background: color-mix(in oklab, var(--pico-card-background-color), transparent 0%);
+}
+
+.solutions .card-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--brand-2);
+}
+
+/* Video embeds */
+.video-grid {
+  gap: 1.25rem;
+}
+
+.video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--pico-muted-border-color), transparent 20%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+}
+
+.video iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Form */
+form[aria-labelledby="signup-title"] {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+/* Footer */
+footer {
+  border-top: 1px solid color-mix(in oklab, var(--pico-muted-border-color), transparent 40%);
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+}

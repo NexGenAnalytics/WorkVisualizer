@@ -1,92 +1,275 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
+
 <head>
-    <meta charset="UTF-8">
-    <link rel="icon" href="media/favicon.png" type="image/x-icon">
-    <link rel="shortcut icon" href="media/favicon.png" type="image/x-icon">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WorkVisualizer</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WorkVisualizer — Your HPC Application, Analyzed</title>
+    <meta name="description"
+        content="Analyze and optimize HPC applications with intelligent insights and powerful visualizations." />
+    <meta property="og:title" content="WorkVisualizer — Your HPC Application, Analyzed" />
+    <meta property="og:description"
+        content="Analyze and optimize HPC applications with intelligent insights and powerful visualizations." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="assets/app-screenshot.png" />
+    <link rel="icon" href="assets/favicon.png" />
+
+    <!-- Pico CSS (CDN) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+
+    <link rel="stylesheet" href="assets/style.css" />
 </head>
+
 <body>
-    <div class="container">
-        <header>
-            <img src="media/wv_readme_wordmark.png" alt="wordmark" class="logo">
-            <p class="subtitle">High-level, interactive, visual performance analysis for High-Performance Computing (HPC)</p>
-        </header>
-        <div class="social-icons">
-            <a href="https://ng-analytics.com">
-                <img src="media/nga_icon_white.png" height="55px" width="55px" alt="NGA icon" class="nga-icon">
-            </a>
-            <a href="https://github.com/NexGenAnalytics/WorkVisualizer">
-                <img src="media/github_icon.png" height="40px" width="40px" alt="GitHub icon">
-            </a>
-        </div>
-        <hr>
-        <section class="content">
-            <div class="video-section">
-                <div class="text-container">
-                    <h2>Your Application’s Execution, <em>Visualized</em>.</h2>
-                    <ul>
-                        <li>Is your parallel program <strong>losing time?</strong></li>
-                        <li>Are some MPI ranks <strong>waiting on others?</strong></li>
-                        <li>Are you <strong>wasting compute resources</strong> with inefficient code?</li>
-                        <li>Are you <strong>wasting developer time</strong> searching for the problem?</li>
-                    </ul>
-                </div>
-                <div class="video-container">
-                    <iframe width="560" height="315" src="https://www.youtube.com/embed/of9SjCil-yw?si=8cCV1oJWy7ftLguX" title="Executive Summary" frameborder="1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-                </div>
+
+    <!-- Header -->
+    <header class="container navbar">
+        <nav>
+            <ul>
+                <li class="brand">
+                    <img src="assets/logo.svg" alt="WorkVisualizer logo" class="brand-logo" />
+                    <span class="brand-name">WorkVisualizer</span>
+                </li>
+            </ul>
+            <ul>
+                <li><a href="#product" role="button" class="secondary outline">Product</a></li>
+                <li><a href="#solutions" role="button" class="secondary outline">Solutions</a></li>
+                <li><a href="#signup" role="button" class="btn-primary">Get Started</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container">
+
+        <!-- Hero -->
+        <section class="hero" id="top">
+            <h1>Your HPC Application, <em>Analyzed</em></h1>
+            <p class="lead">
+                WorkVisualizer helps you quickly uncover inefficiencies in parallel codes by combining
+                intelligent analysis with powerful, interactive visualizations.
+            </p>
+            <div class="actions">
+                <a href="#signup" role="button" class="btn-primary">Join the Waitlist</a>
+                <a href="#product" role="button" class="contrast">Learn More</a>
             </div>
-            <hr>
-            <div class="carousel">
-                <div class="carousel-item">
-                    <img src="media/proportion_analyzer.png" alt="Image 3">
-                    <p class="caption"><b>Proportion Analyzer</b>: Find which functions take the most time.</p>
-                </div>
-                <div class="carousel-item active">
-                    <img src="media/analysis_viewer_slices.png" alt="Image 1">
-                    <p class="caption"><b>Analysis Viewer</b>: Determine where time is lost in your program.</p>
-                </div>
-                <div class="carousel-item">
-                    <img src="media/events_plot.png" alt="Image 2">
-                    <p class="caption"><b>Events Plot</b>: View a trace-like visualization of the app's execution.</p>
-                </div>
-                <button class="carousel-control prev" onclick="prevSlide()">&#10094;</button>
-                <button class="carousel-control next" onclick="nextSlide()">&#10095;</button>
-            </div>
-            <hr>
-            <div class="demo-video">
-                <p class="standard">For more information, please see our walkthrough demonstration video of the current features implemented in the WorkVisualizer.</p>
-                <iframe width="560" height="315" src="https://www.youtube.com/embed/QXzInmC8I2U?si=lSjNLRcRavxuWN0_" title="WorkVisualizer Walkthrough Demonstration" frameborder="1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-            </div>
-            <hr>
-            <div class="footer">
-                <p class="standard">The WorkVisualizer 1.0.0-alpha was supported by the U.S. Department of Energy, Office of Science, Office of Advanced Scientific Computing Research through the Small Business Innovation Research (SBIR) Program, under SBIR Phase I Award DE-SC-0024832.</p>
-                <p><i>Questions? info@ng-analytics.com</i></p>
+
+            <div class="screenshot-wrap" aria-label="Application screenshot">
+                <img class="screenshot" src="assets/app_screenshot.png" alt="WorkVisualizer application screenshot" />
             </div>
         </section>
-    </div>
+
+        <!-- Product -->
+        <section id="product" aria-labelledby="product-title">
+            <header class="section-header">
+                <h2 id="product-title">High-Level Insights</h2>
+                <p class="muted">Collect. Analyze. Visualize. Purpose-built for large-scale parallel applications.</p>
+            </header>
+
+            <div class="grid feature">
+                <article>
+                    <h3>
+                        Low-Overhead Data Collection
+                    </h3>
+                    <p class="muted">
+                        Collect data with minimal overhead. WorkVisualizer supports both pre and post-processing
+                        capabilities.
+                    </p>
+                </article>
+                <div>
+                    <img src="assets/calltree.png" alt="Call Tree" loading="lazy" />
+                </div>
+            </div>
+
+            <div class="grid feature">
+                <div>
+                    <img src="assets/feature_analysis.png" alt="Analysis charts and suggestions" loading="lazy" />
+                </div>
+                <article>
+                    <h3>
+                        ML-Guided Analysis
+                    </h3>
+                    <p class="muted">
+                        Analyze your application's execution using our advanced machine learning algorithms.
+                        Understand stalls, imbalance, communication issues, and receive targeted optimization
+                        suggestions.
+                    </p>
+                </article>
+            </div>
+
+            <div class="grid feature">
+                <article>
+                    <h3>
+                        Interactive Visualizations
+                    </h3>
+                    <p class="muted">
+                        Visualize massive profiling datasets from large-scale parallel applications.
+                        Navigate timelines, drill down function calls, explore node heatmaps, and more, designed
+                        specifically for HPC.
+                    </p>
+                </article>
+                <div>
+                    <img src="assets/feature_visualization.png" alt="Interactive visualization in app" loading="lazy" />
+                </div>
+            </div>
+        </section>
+
+        <!-- Solutions -->
+        <section id="solutions" aria-labelledby="solutions-title">
+            <header class="section-header">
+                <h2 id="solutions-title">Solutions that Move the Needle</h2>
+                <p class="muted">From research groups to production supercomputers.</p>
+            </header>
+
+            <div class="grid solutions">
+                <article>
+                    <header style="display:flex; align-items:center; gap:.6rem;">
+                        <svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" />
+                        </svg>
+                        <strong>One Tool, Lower Costs</strong>
+                    </header>
+                    <p class="muted">
+                        Replace multiple vendor-specific profilers with a single, unified workflow. Cut licensing and
+                        training overhead while standardizing how teams analyze performance.
+                    </p>
+                </article>
+
+                <article>
+                    <header style="display:flex; align-items:center; gap:.6rem;">
+                        <svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 3a9 9 0 1 0 9 9M12 7v6l4 2" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <strong>Faster Development & Adoption</strong>
+                    </header>
+                    <p class="muted">
+                        Reduce optimization cycles and accelerate projects on new technologies. Lower the entry barrier
+                        so small and mid-sized teams can confidently benefit from HPC sooner.
+                    </p>
+                </article>
+
+                <article>
+                    <header style="display:flex; align-items:center; gap:.6rem;">
+                        <svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 5l-3 7h6l-3 7M6" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <strong>Utilization & Energy Savings</strong>
+                    </header>
+                    <p class="muted">
+                        Improve resource utilization to cut compute time, queue churn, and idle cycles. Deliver
+                        measurable energy and cost savings at scale.
+                    </p>
+                </article>
+
+            </div>
+        </section>
+
+        <section id="demos" aria-labelledby="demos-title">
+            <header class="section-header">
+                <h2 id="demos-title">Watch the Demos</h2>
+            </header>
+
+            <div class="grid video-grid">
+                <!-- Executive summary -->
+                <div class="video">
+                    <iframe src="https://www.youtube-nocookie.com/embed/of9SjCil-yw"
+                        title="WorkVisualizer — Executive Summary" loading="lazy"
+                        referrerpolicy="strict-origin-when-cross-origin"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowfullscreen></iframe>
+                </div>
+
+                <!-- Full walkthrough -->
+                <div class="video">
+                    <iframe src="https://www.youtube-nocookie.com/embed/QXzInmC8I2U"
+                        title="WorkVisualizer — Full Walkthrough" loading="lazy"
+                        referrerpolicy="strict-origin-when-cross-origin"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowfullscreen></iframe>
+                </div>
+            </div>
+        </section>
+
+        <!-- Signup -->
+        <section id="signup" aria-labelledby="signup-title">
+            <header class="section-header">
+                <h2 id="signup-title">Join the Waitlist</h2>
+                <p class="muted">We'll email important development updates, release dates, and early-access
+                    opportunities.</p>
+            </header>
+
+            <form action="https://formspree.io/f/xyznzdqa" method="POST">
+                <div class="grid">
+                    <label>
+                        Full Name <span aria-hidden="true" title="required">*</span>
+                        <input type="text" name="name" required autocomplete="name" />
+                    </label>
+                    <label>
+                        Email <span aria-hidden="true" title="required">*</span>
+                        <input type="email" name="email" required autocomplete="email" />
+                    </label>
+                </div>
+
+                <div class="grid">
+                    <label>
+                        Organization
+                        <input type="text" name="organization" />
+                    </label>
+                    <label>
+                        Role
+                        <input type="text" name="role" />
+                    </label>
+                </div>
+
+                <label>
+                    What would you like to optimize?
+                    <textarea name="message" rows="4"
+                        placeholder="Briefly describe your application or interest (optional)"></textarea>
+                </label>
+
+                <fieldset>
+                    <label>
+                        <input type="checkbox" name="consent" required />
+                        I consent to NexGen Analytics storing my information for updates and early-access invitations as
+                        described in the <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
+                    </label>
+                </fieldset>
+
+                <!-- Basic spam trap -->
+                <input type="text" name="_gotcha" style="display:none" />
+
+                <button type="submit" class="btn-primary">Join</button>
+            </form>
+        </section>
+
+        <section id="info">
+            <p>
+                The WorkVisualizer 1.0.0-alpha was supported by the U.S. Department of Energy, Office of Science, Office
+                of Advanced Scientific Computing Research through the Small Business Innovation Research (SBIR) Program,
+                under SBIR Phase I Award DE-SC-0024832.
+            </p>
+        </section>
+
+        <!-- Footer -->
+        <footer class="container">
+            <nav>
+                <ul>
+                    <li>&copy; <span id="y"></span> NexGen Analytics L.C.</li>
+                </ul>
+                <ul>
+                    <li><a href="https://ng-analytics.com/" target="_blank" rel="noopener">About Us</a></li>
+                    <li><a href="privacy.html">Privacy Policy</a></li>
+                </ul>
+            </nav>
+        </footer>
+    </main>
+
     <script>
-        let currentSlide = 0;
-        const slides = document.querySelectorAll('.carousel-item');
-
-        function showSlide(index) {
-            // Wrap the index for infinite looping
-            currentSlide = (index + slides.length) % slides.length;
-
-            // Hide all slides and show only the current one
-            slides.forEach((slide, idx) => {
-                slide.classList.toggle('active', idx === currentSlide);
-            });
-        }
-
-        function nextSlide() { showSlide(currentSlide + 1); }
-        function prevSlide() { showSlide(currentSlide - 1); }
-
-        // Initialize the carousel by showing the first slide
-        showSlide(currentSlide);
+        // Update year without any frameworks
+        document.getElementById('y').textContent = new Date().getFullYear();
     </script>
 </body>
-</html>
 
+</html>
